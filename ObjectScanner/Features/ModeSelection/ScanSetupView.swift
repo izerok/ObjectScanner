@@ -14,7 +14,6 @@ struct ScanSetupView: View {
         var kinds: Set<ScanEngineKind> = []
         if ObjectCaptureEngine.availability.isUsable { kinds.insert(.objectCapture) }
         if TurntableCaptureEngine.availability.isUsable { kinds.insert(.turntable) }
-        if LidarTurntableEngine.availability.isUsable { kinds.insert(.lidarTurntable) }
         if TrueDepthEngine.availability.isUsable { kinds.insert(.trueDepth) }
         if RoomCaptureEngine.availability.isUsable { kinds.insert(.roomPlan) }
         return kinds
@@ -45,7 +44,7 @@ struct ScanSetupView: View {
                 recommendationSection
             }
             modeSection
-            if selectedKind != .roomPlan && selectedKind != .lidarTurntable {
+            if selectedKind != .roomPlan {
                 detailSection
             }
             diagnosticsSection
@@ -56,7 +55,6 @@ struct ScanSetupView: View {
             switch selectedKind {
             case .objectCapture: ObjectCaptureFlowView()
             case .turntable: TurntableFlowView()
-            case .lidarTurntable: LidarTurntableFlowView()
             case .trueDepth: TrueDepthFlowView()
             case .roomPlan: RoomFlowView()
             }
@@ -334,7 +332,6 @@ struct ScanSetupView: View {
         switch kind {
         case .objectCapture: return ObjectCaptureEngine.availability.blockedReason
         case .turntable: return TurntableCaptureEngine.availability.blockedReason
-        case .lidarTurntable: return LidarTurntableEngine.availability.blockedReason
         case .trueDepth: return TrueDepthEngine.availability.blockedReason
         case .roomPlan: return RoomCaptureEngine.availability.blockedReason
         }

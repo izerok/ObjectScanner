@@ -221,7 +221,7 @@ private struct TurntableSetupGuide: View {
 
 // MARK: - Preview layer
 
-struct CameraPreviewView: UIViewRepresentable {
+private struct CameraPreviewView: UIViewRepresentable {
     let session: AVCaptureSession
     let maskFrame: CGRect
     let onMaskChange: (CGRect) -> Void
@@ -230,82 +230,22 @@ struct CameraPreviewView: UIViewRepresentable {
         let view = PreviewView()
         view.previewLayer.session = session
         view.previewLayer.videoGravity = .resizeAspectFill
-        installReporter(on: view)
         return view
     }
 
     func updateUIView(_ view: PreviewView, context: Context) {
-        installReporter(on: view)
-        view.scheduleReport()
-    }
-
-    /// Reports the mask in capture coordinates. Called on every update *and*
-    /// from `layoutSubviews` — the update path alone is not enough: the
-    /// first update can land before the view has bounds, and if nothing in
-    /// the parent re-renders afterwards, the engine never learns the mask
-    /// and every capture action dead-ends on "place the frame first"
-    /// (v0.3.2: this was the pure-LiDAR mode's dead-button root cause).
-    private func installReporter(on view: PreviewView) {
-        let maskFrame = self.maskFrame
-        let onMaskChange = self.onMaskChange
-        view.reportMask = { [weak view] in
-            // Only while genuinely on screen with a live session: reporting
-            // during teardown (the capture stage is dismantled the moment
-            // reconstruction starts) pokes a half-dead preview layer and
-            // crashed the photogrammetry turntable's finish (v0.3.4).
-            guard let view, view.window != nil,
-                  view.bounds.width > 0, view.bounds.height > 0,
-                  view.previewLayer.session != nil else { return }
-            // `metadataOutputRectConverted` is the only correct way to go from
-            // on-screen coordinates to the capture device's normalised space:
-            // it accounts for `videoGravity` cropping and the preview's own
-            // orientation, which hand-rolled arithmetic would get wrong.
-            let converted = view.previewLayer.metadataOutputRectConverted(fromLayerRect: maskFrame)
-            // Skip redundant reports: the consumer is an @Observable setter,
-            // and re-reporting an unchanged rect on every layout pass would
-            // churn view updates for nothing.
-            if let last = view.lastReportedMask,
-               abs(last.minX - converted.minX) < 0.0001, abs(last.minY - converted.minY) < 0.0001,
-               abs(last.width - converted.width) < 0.0001, abs(last.height - converted.height) < 0.0001 {
-                return
-            }
-            view.lastReportedMask = converted
-            onMaskChange(converted)
-        }
-    }
-
-    static func dismantleUIView(_ view: PreviewView, coordinator: ()) {
-        view.reportMask = nil
+        // `metadataOutputRectConverted` is the only correct way to go from on-screen
+        // coordinates to the capture device's normalised space: it accounts for
+        // `videoGravity` cropping and the preview's own orientation, which hand-rolled
+        // arithmetic would get wrong.
+        guard view.bounds.width > 0, view.bounds.height > 0 else { return }
+        let converted = view.previewLayer.metadataOutputRectConverted(fromLayerRect: maskFrame)
+        onMaskChange(converted)
     }
 
     final class PreviewView: UIView {
         override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
         var previewLayer: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
-
-        var reportMask: (() -> Void)?
-        var lastReportedMask: CGRect?
-        private var reportScheduled = false
-
-        /// Reports are ALWAYS delivered on the next runloop turn, never
-        /// synchronously. The consumer is an @Observable setter: calling it
-        /// from inside layout (v0.3.2) let a finish-time transition — bounds
-        /// oscillating while the capture stage is dismantled — feed back
-        /// into layout and recurse until the app died. Coalescing here makes
-        /// that loop structurally impossible (v0.4.1).
-        func scheduleReport() {
-            guard !reportScheduled, reportMask != nil else { return }
-            reportScheduled = true
-            DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
-                self.reportScheduled = false
-                self.reportMask?()
-            }
-        }
-
-        override func layoutSubviews() {
-            super.layoutSubviews()
-            scheduleReport()
-        }
     }
 }
 
@@ -613,7 +553,7 @@ private struct TurntableMessageView: View {
     }
 }
 
-struct TurntablePrimaryButton: ButtonStyle {
+private struct TurntablePrimaryButton: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.subheadline.weight(.semibold))
@@ -623,7 +563,7 @@ struct TurntablePrimaryButton: ButtonStyle {
     }
 }
 
-struct TurntableSecondaryButton: ButtonStyle {
+private struct TurntableSecondaryButton: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.subheadline.weight(.medium))
@@ -635,7 +575,7 @@ struct TurntableSecondaryButton: ButtonStyle {
 }
 
 /// Draggable, pinchable rectangle marking the object.
-struct ObjectMaskRectangle: View {
+private struct ObjectMaskRectangle: View {
     @Binding var frame: CGRect
 
     @State private var dragOffset = CGSize.zero
