@@ -68,7 +68,13 @@ struct PhotogrammetryReconstructor {
         let imageCount = imageURLs.count
         guard imageCount > 0 else { throw ScanEngineError.noImagesCaptured }
 
-        var configuration = PhotogrammetrySession.Configuration(checkpointDirectory: workspace.checkpointURL)
+        // No checkpoint directory (v0.6.4, single-variable A/B): device crash
+        // logs show EXC_BREAKPOINT inside PhotogrammetrySession init on
+        // iOS 27.3 beta — the framework throws a C++ std::filesystem_error
+        // (weakly_canonical) during session setup that never becomes a Swift
+        // error, and the checkpoint URL is the only path in the configuration.
+        // nil costs resumability after a background kill, not correctness.
+        var configuration = PhotogrammetrySession.Configuration()
         // Guided capture and turntable capture both write images in orbit order,
         // which spares the solver an all-pairs matching search.
         configuration.sampleOrdering = .sequential
