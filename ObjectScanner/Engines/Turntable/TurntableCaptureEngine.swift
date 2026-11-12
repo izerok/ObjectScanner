@@ -171,16 +171,18 @@ final class TurntableCaptureEngine: ScanEngine {
 
         let output: PhotogrammetryReconstructor.Output
         do {
-            // Folder input, not the masked sample sequence (v0.6.3): device
-            // crash logs end at the session's storage-space check, which is
-            // where the sequence input is first consumed — materialising
-            // 48 MP samples there is the prime suspect, and the folder path
-            // is the one the orbit mode proves daily. The session's own
-            // object masking stays enabled and does the segmentation.
+            // The drawn mask is load-bearing, not just framing (v0.6.5): the
+            // session's automatic object masking keeps only the dominant
+            // subject and discards the 10 mm calibration cube next to it as
+            // clutter — a real-device scan came back with the cube missing
+            // from the mesh. The rect mask is what keeps everything inside
+            // the frame, cube included. The sample-sequence path itself was
+            // exonerated by the crash-log analysis; the finish crash was the
+            // checkpoint directory (gone since v0.6.4).
             output = try await reconstructor.reconstruct(
                 workspace: workspace,
                 detail: .reduced,
-                maskRect: nil,
+                maskRect: objectMaskRect,
                 onWarning: { [weak self] note in
                     self?.warnings.append(note)
                 }
