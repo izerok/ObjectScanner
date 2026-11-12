@@ -10,7 +10,6 @@ struct LidarTurntableFlowView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var engine: LidarTurntableEngine?
-    @AppStorage("turntable.clockwise") private var turntableClockwise = false
     @State private var finishedRecord: ScanRecord?
     @State private var startupError: String?
     @State private var hasSeenGuide = false
@@ -185,6 +184,7 @@ private struct LidarOverlay: View {
     let engine: LidarTurntableEngine
     let onCancel: () -> Void
 
+    @AppStorage("turntable.clockwise") private var turntableClockwise = false
     @State private var isFinishing = false
     @State private var isConfirmingCancel = false
     @State private var finishError: String?
