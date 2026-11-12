@@ -68,6 +68,13 @@ final class DepthStreamSession: NSObject, AVCaptureDepthDataOutputDelegate, @unc
         })
 
         session.beginConfiguration()
+        // Depth data delivery is documented and sampled against the photo
+        // preset; with the default preset the session runs and the preview
+        // shows, but the depth delegate may simply never fire. The
+        // photogrammetry coordinator in this app uses .photo for the same
+        // reason. (v0.3.1: this was the prime suspect for "buttons do
+        // nothing" — the stream underneath the UI was never alive.)
+        session.sessionPreset = .photo
         do {
             try device.lockForConfiguration()
             device.activeFormat = format

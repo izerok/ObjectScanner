@@ -64,6 +64,18 @@ final class LidarTurntableEngine: ScanEngine {
     private(set) var currentPitchDegrees: Float?
     private(set) var previousPassPitchDegrees: Float?
 
+    /// Health of the depth stream, watched continuously so a dead stream is
+    /// visible in the UI instead of presenting as dead buttons (v0.3.1).
+    enum DepthStreamState: Equatable, Sendable {
+        case waiting
+        case live
+        case stalled
+    }
+
+    private(set) var depthStreamState: DepthStreamState = .waiting
+
+    var isDepthLive: Bool { depthStreamState == .live }
+
     var pitchChangeDegrees: Float? {
         guard let currentPitchDegrees, let previousPassPitchDegrees else { return nil }
         return abs(currentPitchDegrees - previousPassPitchDegrees)
@@ -85,6 +97,7 @@ final class LidarTurntableEngine: ScanEngine {
     private let core = LidarFusionCore()
     private let motion = CMMotionManager()
     private var autoCaptureTask: Task<Void, Never>?
+    private var streamMonitorTask: Task<Void, Never>?
     private var lastUsedTimestamp: CMTime = .invalid
     private var passPitchDegrees: Float?
 
@@ -120,6 +133,7 @@ final class LidarTurntableEngine: ScanEngine {
         stream.start()
 
         startMotion()
+        startStreamMonitor()
         phase = .framing
         Self.logger.info("LiDAR döner tabla oturumu başladı")
     }
@@ -219,10 +233,10 @@ final class LidarTurntableEngine: ScanEngine {
             statusMessage = String(localized: "Derinlik akışı henüz hazır değil — bir saniye bekleyin.")
             return
         }
-        guard let mask = objectMaskRect else {
-            statusMessage = String(localized: "Önce çerçeveyi objenin üzerine yerleştirin.")
-            return
-        }
+        // The preview reports the mask continuously, so a nil here means its
+        // first report has not landed yet — fall back to a centred frame
+        // rather than stranding the tap (v0.3.1).
+        let mask = objectMaskRect ?? CGRect(x: 0.15, y: 0.2, width: 0.7, height: 0.6)
         isProcessingShot = true
         statusMessage = nil
         let pitch = currentPitchDegrees
@@ -256,8 +270,15 @@ final class LidarTurntableEngine: ScanEngine {
     }
 
     private func captureShot() {
-        guard let depth = freshDepth() else { return }
-        guard let mask = objectMaskRect else { return }
+        guard let depth = freshDepth() else {
+            // v0.3 returned silently here — the tap looked dead. Always say why.
+            statusMessage = String(localized: "Derinlik akışı henüz hazır değil — bir saniye bekleyin.")
+            return
+        }
+        guard let mask = objectMaskRect else {
+            statusMessage = String(localized: "Önce çerçeveyi objenin üzerine yerleştirin.")
+            return
+        }
         isProcessingShot = true
         let core = self.core
         let box = DepthFrameBox(depth)
@@ -319,6 +340,30 @@ final class LidarTurntableEngine: ScanEngine {
         return depth
     }
 
+    /// Watches the stream's frame timestamps: a stream that never delivers
+    /// (or stops delivering) must be a visible state, not a silent failure.
+    private func startStreamMonitor() {
+        streamMonitorTask?.cancel()
+        streamMonitorTask = Task { @MainActor [weak self] in
+            var lastSeen: CMTime = .invalid
+            var lastChange = Date()
+            while !Task.isCancelled {
+                guard let self else { return }
+                if let stream = self.stream {
+                    let timestamp = stream.latestTimestamp
+                    if timestamp.isValid {
+                        if !lastSeen.isValid || CMTimeCompare(timestamp, lastSeen) != 0 {
+                            lastSeen = timestamp
+                            lastChange = Date()
+                        }
+                        self.depthStreamState = Date().timeIntervalSince(lastChange) < 2.5 ? .live : .stalled
+                    }
+                }
+                try? await Task.sleep(for: .milliseconds(500))
+            }
+        }
+    }
+
     private func startMotion() {
         guard motion.isDeviceMotionAvailable else { return }
         motion.deviceMotionUpdateInterval = 0.1
@@ -345,6 +390,7 @@ final class LidarTurntableEngine: ScanEngine {
     private func teardown() {
         stream = nil
         autoCaptureTask?.cancel()
+        streamMonitorTask?.cancel()
     }
 
     private static func defaultName(for date: Date) -> String {

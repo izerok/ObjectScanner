@@ -248,6 +248,7 @@ private struct LidarOverlay: View {
         switch engine.passState {
         case .framing:
             VStack(spacing: 10) {
+                depthStreamStatusLine
                 Text(String(localized: "Çerçeveyi objenin üzerine yerleştirin; tabla kenarı çerçeve dışında kalsın."))
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.85))
@@ -358,8 +359,30 @@ private struct LidarOverlay: View {
         }
     }
 
+    private var depthStreamStatusLine: some View {
+        HStack(spacing: 6) {
+            switch engine.depthStreamState {
+            case .waiting:
+                ProgressView().tint(.white).scaleEffect(0.7)
+                Text(String(localized: "Derinlik akışı bekleniyor…"))
+            case .live:
+                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                Text(String(localized: "Derinlik akışı hazır"))
+            case .stalled:
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                Text(String(localized: "Derinlik akışı kesildi"))
+            }
+        }
+        .font(.caption.weight(.medium))
+        .foregroundStyle(.white.opacity(0.9))
+    }
+
     private var statsRow: some View {
         HStack(spacing: 14) {
+            if !engine.isDepthLive {
+                Label(String(localized: "Derinlik akışı kesildi"), systemImage: "sensor.fill")
+                    .foregroundStyle(.orange)
+            }
             if let delta = engine.lastDeltaDegrees {
                 Label("\(Int(delta.rounded()))°", systemImage: "rotate.right")
             }

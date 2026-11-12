@@ -5925,6 +5925,57 @@
           }
         }
       }
+    },
+    "Derinlik akışı bekleniyor…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for the depth stream…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在等待深度流…"
+          }
+        }
+      }
+    },
+    "Derinlik akışı hazır": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Depth stream live"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "深度流正常"
+          }
+        }
+      }
+    },
+    "Derinlik akışı kesildi": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Depth stream stalled"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "深度流中断"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
