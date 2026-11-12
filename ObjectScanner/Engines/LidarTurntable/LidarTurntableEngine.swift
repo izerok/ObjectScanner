@@ -164,16 +164,20 @@ final class LidarTurntableEngine: ScanEngine {
 
         phase = .reconstructing(ReconstructionProgress(fraction: 0.75, stage: .meshGeneration))
 
-        let modelURL = workspace.modelURL
         let cloudURL = workspace.root.appending(path: "cloud.ply", directoryHint: .notDirectory)
         let mesh = extracted.mesh
         let points = extracted.points
+        let workspaceRoot = workspace.root
+        let modelFileName: String
         do {
-            try await Task.detached(priority: .userInitiated) {
-                try MeshFileWriter.write(mesh: mesh, to: modelURL)
+            modelFileName = try await Task.detached(priority: .userInitiated) { () throws -> String in
+                let fileName = try MeshFileWriter.write(mesh: mesh, toDirectory: workspaceRoot)
+                // The point cloud is a byproduct; its failure must never fail
+                // a scan whose mesh already succeeded (v0.3.3).
                 if !points.isEmpty {
-                    try PointCloudFile.write(points: points, to: cloudURL)
+                    try? PointCloudFile.write(points: points, to: cloudURL)
                 }
+                return fileName
             }.value
         } catch {
             phase = .failed(message: error.localizedDescription)
@@ -188,7 +192,7 @@ final class LidarTurntableEngine: ScanEngine {
             id: workspace.id,
             name: Self.defaultName(for: Date()),
             engine: Self.kind,
-            modelFileName: "model.usdz",
+            modelFileName: modelFileName,
             isMetricallyScaled: true,
             imageCount: totalShots,
             pointCount: points.count,
@@ -531,17 +535,42 @@ final class LidarFusionCore: @unchecked Sendable {
     func extractMeshAndPoints() -> (mesh: SurfaceNets.Mesh, points: [SIMD3<Float>], dimensions: SIMD3<Float>?)? {
         guard let volume else { return nil }
         let mesh = SurfaceNets.extract(from: volume)
-        var cloud = fusedCloud
-        cloud.pruneSingleObservations()
-        return (mesh, cloud.points, cloud.dimensions)
+        // Pruning single-observation voxels suits a dense continuous stream
+        // (TrueDepth). A turntable's frames are discrete: if registration is
+        // a voxel off, nearly every cell is a single observation and pruning
+        // would erase the whole cloud (v0.3.3). Fall back to the raw cloud.
+        var pruned = fusedCloud
+        pruned.pruneSingleObservations()
+        let source = pruned.isEmpty ? fusedCloud : pruned
+        let points = source.pointCount > 400_000 ? source.sampledPoints(limit: 400_000) : source.points
+        return (mesh, points, source.dimensions)
     }
 }
 
 // MARK: - Mesh writing
 
 enum MeshFileWriter {
-    /// Writes a surface-nets mesh as USDZ via ModelIO.
-    static func write(mesh: SurfaceNets.Mesh, to url: URL) throws {
+    /// Writes a surface-nets mesh into `directory`, preferring USDZ and
+    /// falling back to OBJ where ModelIO refuses USD export (v0.3.3).
+    /// Returns the file name actually written.
+    static func write(mesh: SurfaceNets.Mesh, toDirectory directory: URL) throws -> String {
+        let usdzURL = directory.appending(path: "model.usdz", directoryHint: .notDirectory)
+        if MDLAsset.canExportFileExtension("usdz") {
+            do {
+                try writeAsset(mesh: mesh, to: usdzURL)
+                if FileManager.default.fileExists(atPath: usdzURL.path(percentEncoded: false)) {
+                    return "model.usdz"
+                }
+            } catch {
+                // Fall through to OBJ.
+            }
+        }
+        let objURL = directory.appending(path: "model.obj", directoryHint: .notDirectory)
+        try writeAsset(mesh: mesh, to: objURL)
+        return "model.obj"
+    }
+
+    private static func writeAsset(mesh: SurfaceNets.Mesh, to url: URL) throws {
         var interleaved: [Float] = []
         interleaved.reserveCapacity(mesh.vertices.count * 6)
         for index in mesh.vertices.indices {
