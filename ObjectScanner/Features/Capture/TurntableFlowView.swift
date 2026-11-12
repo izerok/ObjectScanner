@@ -136,13 +136,13 @@ private struct TurntableSetupGuide: View {
                 )
 
                 requirement(
-                    "Arka plan sade olursa yine iyi olur",
+                    String(localized: "Arka plan sade olursa yine iyi olur"),
                     detail: String(localized: "Çerçeve işi çözüyor ama kenarları objeye çok yakınsa yardımcı olur: mümkünse arka planı biraz geriye al, yan yana kâğıt yerine tek parça bir fon kullan."),
                     systemImage: "square.dashed"
                 )
 
                 requirement(
-                    "Telefon sabit dursun",
+                    String(localized: "Telefon sabit dursun"),
                     detail: String(localized: "Tripod veya bir desteğe yasla. Çekim sırasında telefona dokunma."),
                     systemImage: "iphone.gen3"
                 )

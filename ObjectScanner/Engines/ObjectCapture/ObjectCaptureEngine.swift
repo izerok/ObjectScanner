@@ -81,7 +81,7 @@ final class ObjectCaptureEngine: ScanEngine {
 
     func start() throws {
         guard case .available = Self.availability else {
-            throw ScanEngineError.sessionUnavailable(Self.availability.blockedReason ?? "Bilinmeyen sebep")
+            throw ScanEngineError.sessionUnavailable(Self.availability.blockedReason ?? String(localized: "Bilinmeyen sebep"))
         }
 
         phase = .preparing
@@ -114,7 +114,7 @@ final class ObjectCaptureEngine: ScanEngine {
 
     func finish() async throws -> ScanRecord {
         guard let session, let workspace else {
-            throw ScanEngineError.sessionUnavailable("Aktif oturum yok.")
+            throw ScanEngineError.sessionUnavailable(String(localized: "Aktif oturum yok."))
         }
 
         // iOS offers exactly one detail level for on-device photogrammetry, so
@@ -401,7 +401,7 @@ final class ObjectCaptureEngine: ScanEngine {
 
     private static func defaultName(for date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "tr_TR")
+        formatter.locale = Locale(identifier: "zh_Hans")
         formatter.dateFormat = "d MMM HH:mm"
         return "Tarama \(formatter.string(from: date))"
     }

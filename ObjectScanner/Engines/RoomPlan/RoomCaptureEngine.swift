@@ -108,7 +108,7 @@ final class RoomCaptureEngine: ScanEngine {
 
     func start() throws {
         guard case .available = Self.availability else {
-            throw ScanEngineError.sessionUnavailable(Self.availability.blockedReason ?? "Bilinmeyen sebep")
+            throw ScanEngineError.sessionUnavailable(Self.availability.blockedReason ?? String(localized: "Bilinmeyen sebep"))
         }
 
         phase = .preparing
@@ -172,7 +172,7 @@ final class RoomCaptureEngine: ScanEngine {
 
     func finish() async throws -> ScanRecord {
         guard let workspace else {
-            throw ScanEngineError.sessionUnavailable("Aktif oturum yok.")
+            throw ScanEngineError.sessionUnavailable(String(localized: "Aktif oturum yok."))
         }
 
         guard hasStartedSession else {
@@ -358,7 +358,7 @@ final class RoomCaptureEngine: ScanEngine {
 
     private static func defaultName(for date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "tr_TR")
+        formatter.locale = Locale(identifier: "zh_Hans")
         formatter.dateFormat = "d MMM HH:mm"
         return "Oda \(formatter.string(from: date))"
     }

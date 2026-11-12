@@ -106,7 +106,7 @@ final class TurntableCaptureEngine: ScanEngine {
 
     func start() throws {
         guard case .available = Self.availability else {
-            throw ScanEngineError.sessionUnavailable(Self.availability.blockedReason ?? "Bilinmeyen sebep")
+            throw ScanEngineError.sessionUnavailable(Self.availability.blockedReason ?? String(localized: "Bilinmeyen sebep"))
         }
 
         phase = .preparing
@@ -155,7 +155,7 @@ final class TurntableCaptureEngine: ScanEngine {
 
     func finish() async throws -> ScanRecord {
         guard let coordinator, let workspace else {
-            throw ScanEngineError.sessionUnavailable("Aktif oturum yok.")
+            throw ScanEngineError.sessionUnavailable(String(localized: "Aktif oturum yok."))
         }
 
         stopAutoCapture()
@@ -284,7 +284,7 @@ final class TurntableCaptureEngine: ScanEngine {
 
     private static func defaultName(for date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "tr_TR")
+        formatter.locale = Locale(identifier: "zh_Hans")
         formatter.dateFormat = "d MMM HH:mm"
         return "Tabla \(formatter.string(from: date))"
     }

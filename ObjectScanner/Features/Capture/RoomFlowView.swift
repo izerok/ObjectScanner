@@ -210,7 +210,7 @@ private struct RoomSetupGuide: View {
                 )
 
                 requirement(
-                    "Bir turu tamamla",
+                    String(localized: "Bir turu tamamla"),
                     detail: String(localized: "Odanın çevresini kesintisiz dolaşıp başladığın yere dön. Yarım tur kalan duvarları eksik bırakır."),
                     systemImage: "arrow.trianglehead.clockwise"
                 )
@@ -239,7 +239,7 @@ private struct RoomSetupGuide: View {
                 )
 
                 requirement(
-                    "Tek seferde tek oda",
+                    String(localized: "Tek seferde tek oda"),
                     detail: String(localized: "RoomPlan'in sahne boyut sınırı var. Ev taramak için odaları ayrı ayrı tarayıp modelleri birlikte kullan."),
                     systemImage: "square.split.bottomrightquarter"
                 )

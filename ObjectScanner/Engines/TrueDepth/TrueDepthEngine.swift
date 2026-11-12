@@ -67,7 +67,7 @@ final class TrueDepthEngine: ScanEngine {
 
     func start() throws {
         guard case .available = Self.availability else {
-            throw ScanEngineError.sessionUnavailable(Self.availability.blockedReason ?? "Bilinmeyen sebep")
+            throw ScanEngineError.sessionUnavailable(Self.availability.blockedReason ?? String(localized: "Bilinmeyen sebep"))
         }
 
         phase = .preparing
@@ -112,7 +112,7 @@ final class TrueDepthEngine: ScanEngine {
 
     func finish() async throws -> ScanRecord {
         guard let session, let receiver, let workspace else {
-            throw ScanEngineError.sessionUnavailable("Aktif oturum yok.")
+            throw ScanEngineError.sessionUnavailable(String(localized: "Aktif oturum yok."))
         }
 
         phase = .reconstructing(ReconstructionProgress(fraction: 0.2, stage: .pointCloudGeneration))
@@ -260,7 +260,7 @@ final class TrueDepthEngine: ScanEngine {
 
     private static func defaultName(for date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "tr_TR")
+        formatter.locale = Locale(identifier: "zh_Hans")
         formatter.dateFormat = "d MMM HH:mm"
         return "Derinlik \(formatter.string(from: date))"
     }

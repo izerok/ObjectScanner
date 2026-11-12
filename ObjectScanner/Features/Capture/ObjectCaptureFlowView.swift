@@ -207,7 +207,7 @@ private struct CaptureOverlay: View {
         VStack(spacing: 12) {
             switch engine.phase {
             case .idle, .preparing:
-                instruction("Sensörler hazırlanıyor…", systemImage: "circle.dotted")
+                instruction(String(localized: "Sensörler hazırlanıyor…"), systemImage: "circle.dotted")
 
             case .readyToDetect:
                 instruction(String(localized: "Cihazı objeye doğrultun"), systemImage: "viewfinder")

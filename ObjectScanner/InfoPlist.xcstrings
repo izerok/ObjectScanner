@@ -1,52 +1,64 @@
 {
-  "sourceLanguage" : "tr",
-  "strings" : {
-    "CFBundleName" : {
-      "comment" : "Bundle name",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "tr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "ObjectScanner"
+  "sourceLanguage": "tr",
+  "strings": {
+    "CFBundleName": {
+      "comment": "Bundle name",
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "new",
+            "value": "ObjectScanner"
           }
         }
       }
     },
-    "NSCameraUsageDescription" : {
-      "comment" : "Privacy - Camera Usage Description",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "tr" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Objeleri 3B taramak icin kameraya erisim gerekiyor."
+    "NSCameraUsageDescription": {
+      "comment": "Privacy - Camera Usage Description",
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Objeleri 3B taramak icin kameraya erisim gerekiyor."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "需要相机权限才能对物体进行 3D 扫描。"
           }
         }
       }
     },
-    "ObjectScanner" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ObjectScanner"
+    "ObjectScanner": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ObjectScanner"
           }
         }
       }
     },
-    "Objeleri 3B taramak icin kameraya erisim gerekiyor." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Camera access is required to scan objects in 3D."
+    "Objeleri 3B taramak icin kameraya erisim gerekiyor.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Camera access is required to scan objects in 3D."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "需要相机权限才能对物体进行 3D 扫描。"
           }
         }
       }
     }
   },
-  "version" : "1.0"
+  "version": "1.0"
 }

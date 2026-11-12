@@ -130,10 +130,10 @@ enum DeviceCapabilities {
             ("Object Capture", supportsObjectCapture),
             (String(localized: "Fotogrametri (cihaz üstü)"), supportsPhotogrammetry),
             (String(localized: "Oda taraması (RoomPlan)"), supportsRoomCapture),
-            ("LiDAR sahne mesh'i", supportsSceneReconstruction),
+            (String(localized: "LiDAR sahne mesh'i"), supportsSceneReconstruction),
             (String(localized: "LiDAR derinlik cihazı"), AVCaptureDevice.default(.builtInLiDARDepthCamera, for: .video, position: .back) != nil),
             (String(localized: "Ultra geniş kamera"), AVCaptureDevice.default(.builtInUltraWideCamera, for: .video, position: .back) != nil),
-            ("Telefoto kamera", AVCaptureDevice.default(.builtInTelephotoCamera, for: .video, position: .back) != nil),
+            (String(localized: "Telefoto kamera"), AVCaptureDevice.default(.builtInTelephotoCamera, for: .video, position: .back) != nil),
             (String(localized: "TrueDepth sensörü"), hasTrueDepthCamera),
             (String(localized: "Ön↔arka kalibrasyon (hibrit için)"), hasFrontToRearCalibration),
         ]
