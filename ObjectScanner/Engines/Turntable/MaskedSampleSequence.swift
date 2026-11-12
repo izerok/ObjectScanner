@@ -14,26 +14,28 @@ import os
 /// capture settings — the file is the authority on how big it really is.
 struct MaskedSampleSequence: Sequence {
     let imageURLs: [URL]
-    /// Region to keep, in 0…1 image coordinates. Nil means no masking.
-    let normalizedRect: CGRect?
+    /// Regions to keep, in 0…1 image coordinates (subject rectangle plus,
+    /// since v0.7, the designated calibration object's). Empty means no
+    /// masking.
+    let normalizedRects: [CGRect]
 
     func makeIterator() -> Iterator {
-        Iterator(imageURLs: imageURLs, normalizedRect: normalizedRect)
+        Iterator(imageURLs: imageURLs, normalizedRects: normalizedRects)
     }
 
     struct Iterator: IteratorProtocol {
         private static let logger = Logger(subsystem: "com.example.ObjectScanner", category: "samples")
 
         let imageURLs: [URL]
-        let normalizedRect: CGRect?
+        let normalizedRects: [CGRect]
 
         private var index = 0
         private var cachedMask: CVPixelBuffer?
         private var cachedMaskSize: (width: Int, height: Int)?
 
-        init(imageURLs: [URL], normalizedRect: CGRect?) {
+        init(imageURLs: [URL], normalizedRects: [CGRect]) {
             self.imageURLs = imageURLs
-            self.normalizedRect = normalizedRect
+            self.normalizedRects = normalizedRects
         }
 
         mutating func next() -> PhotogrammetrySample? {
@@ -48,7 +50,7 @@ struct MaskedSampleSequence: Sequence {
                     continue
                 }
 
-                if let normalizedRect {
+                if !normalizedRects.isEmpty {
                     let width = CVPixelBufferGetWidth(sample.image)
                     let height = CVPixelBufferGetHeight(sample.image)
 
@@ -58,7 +60,7 @@ struct MaskedSampleSequence: Sequence {
                         cachedMask = ObjectMaskBuilder.makeMask(
                             width: width,
                             height: height,
-                            normalizedRect: normalizedRect
+                            normalizedRects: normalizedRects
                         )
                         cachedMaskSize = (width, height)
                     }

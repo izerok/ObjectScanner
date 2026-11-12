@@ -23,6 +23,8 @@ struct PhotogrammetryReconstructor {
     ///     coordinates. Only meaningful when the device was stationary — see
     ///     `MaskedSampleSequence`. Nil feeds the images directly and lets the
     ///     session work out the object itself.
+    ///   - extraMaskRect: a second region to keep (v0.7: the designated
+    ///     calibration object's rectangle). The mask is the union of both.
     ///   - enableObjectMasking: lets the session segment a single subject out of
     ///     each frame. Right for an object on a table, actively wrong for a room —
     ///     there the room *is* the subject, and asking for an object gets part of it
@@ -36,6 +38,7 @@ struct PhotogrammetryReconstructor {
         workspace: ScanWorkspace,
         detail: ReconstructionDetail,
         maskRect: CGRect? = nil,
+        extraMaskRect: CGRect? = nil,
         enableObjectMasking: Bool = true,
         framing: PoseDiagnostics.Framing = .orbit,
         onWarning: @escaping @MainActor (String) -> Void = { _ in },
@@ -89,12 +92,12 @@ struct PhotogrammetryReconstructor {
         // does not necessarily read every HEIC we produce, and an earlier version
         // swallowed those failures with `try?` — leaving an empty sequence and an
         // opaque session error. Better to find out on one file than on eighty.
-        var effectiveMask = maskRect
-        if maskRect != nil, let probe = imageURLs.first {
+        var effectiveRects: [CGRect] = [maskRect, extraMaskRect].compactMap { $0 }
+        if !effectiveRects.isEmpty, let probe = imageURLs.first {
             do {
                 _ = try await PhotogrammetrySample(contentsOf: probe)
             } catch {
-                effectiveMask = nil
+                effectiveRects = []
                 Self.logger.error("Örnek okunamadı, maske devre dışı: \(error.localizedDescription, privacy: .public)")
                 await onWarning("Maske uygulanamadı, arka plan dahil edildi: \(error.localizedDescription)")
             }
@@ -106,12 +109,12 @@ struct PhotogrammetryReconstructor {
                 imageURLs: imageURLs,
                 imageCount: imageCount,
                 detail: detail,
-                maskRect: effectiveMask,
+                maskRects: effectiveRects,
                 configuration: configuration,
                 framing: framing,
                 onProgress: onProgress
             )
-        } catch where effectiveMask != nil {
+        } catch where !effectiveRects.isEmpty {
             // Masking is an optimisation, not the point. If the masked run fails for
             // any reason, fall back to the plain folder path so the user still gets a
             // model instead of nothing.
@@ -123,7 +126,7 @@ struct PhotogrammetryReconstructor {
                 imageURLs: imageURLs,
                 imageCount: imageCount,
                 detail: detail,
-                maskRect: nil,
+                maskRects: [],
                 configuration: configuration,
                 framing: framing,
                 onProgress: onProgress
@@ -136,7 +139,7 @@ struct PhotogrammetryReconstructor {
         imageURLs: [URL],
         imageCount: Int,
         detail: ReconstructionDetail,
-        maskRect: CGRect?,
+        maskRects: [CGRect],
         configuration: PhotogrammetrySession.Configuration,
         framing: PoseDiagnostics.Framing,
         onProgress: @escaping @MainActor (ReconstructionProgress) -> Void
@@ -144,12 +147,12 @@ struct PhotogrammetryReconstructor {
 
         let session: PhotogrammetrySession
         do {
-            if let maskRect {
+            if !maskRects.isEmpty {
                 // Samples rather than a folder: a per-frame object mask can only be
                 // attached to a `PhotogrammetrySample`, and the mask is the one thing
                 // that reliably keeps a nearby background out of the model.
                 session = try PhotogrammetrySession(
-                    input: MaskedSampleSequence(imageURLs: imageURLs, normalizedRect: maskRect),
+                    input: MaskedSampleSequence(imageURLs: imageURLs, normalizedRects: maskRects),
                     configuration: configuration
                 )
             } else {

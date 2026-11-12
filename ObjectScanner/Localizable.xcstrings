@@ -5755,6 +5755,431 @@
           }
         }
       }
+    },
+    "Kalibrasyon nesnesi (belirlenen)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calibration object (designated)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "标定物（指定）"
+          }
+        }
+      }
+    },
+    "Bulundu — ölçek ondan alındı": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Found — scale taken from it"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已找到 — 尺度取自它"
+          }
+        }
+      }
+    },
+    "Aşınmış bulundu — ölçek derinlikten": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Found eroded — scale from depth"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "找到但已侵蚀 — 尺度取自深度"
+          }
+        }
+      }
+    },
+    "Beklenenden büyük — ölçek derinlikten": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Larger than expected — scale from depth"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "比预期大 — 尺度取自深度"
+          }
+        }
+      }
+    },
+    "Bulunamadı — ölçek derinlikten": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not found — scale from depth"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未找到 — 尺度取自深度"
+          }
+        }
+      }
+    },
+    "Belirlenen kalibrasyon nesnesi modelde bulunamadı — küple tekrar tarayın veya Galeri'den kumpasla kalibre edin.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The designated calibration object was not found in the model — rescan with it, or calibrate with a caliper in the Library."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "模型里没找到指定的标定物 — 带标定物重扫，或在图库里用卡尺标定。"
+          }
+        }
+      }
+    },
+    "Bu ilk adım: sürükleyerek taşı, iki parmakla boyutlandır. Sadece çerçevelerin içi modellenir — masa, kâğıt ve arka plan tamamen dışlanır. Telefon sabit olduğu için çerçeveler bütün kareler için geçerli.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This is the first step: drag to move, pinch to resize. Only what's inside the frames is modelled — table, paper and background are fully excluded. The phone is stationary, so the frames hold for every shot."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这是第一步：拖动移动、双指缩放。只有框内的部分会被建模 — 桌面、垫纸和背景全部排除。手机固定不动，两个框对所有照片都有效。"
+          }
+        }
+      }
+    },
+    "İkinci adımda kalibrasyon nesnesini belirle": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Designate the calibration object in step two"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第二步指定标定物"
+          }
+        }
+      }
+    },
+    "Yüksekliği 10 mm olan küçük bir nesneyi (küp, blok, üst üste para) objenin yanına (1–2 cm) koy. Çekimden önce yeşil çerçeveyi onun üzerine yerleştireceksin — uygulama hangisinin obje, hangisinin kalibrasyon nesnesi olduğunu böyle bilecek; modelde o nesneyi arayıp ölçeği ondan alacak, bulamazsa söyleyecek.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Place a small object 10 mm tall (a cube, a block, stacked coins) next to the object (1–2 cm away). Before shooting you will place the green frame over it — that is how the app knows which is the subject and which is the calibration object; it will find that object in the model, take the scale from it, and say so if it can't."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "把一个高 10mm 的小东西（方块、垫块、叠起来的硬币）放在被测物旁边（1–2cm）。拍摄前用绿框套住它 — App 由此知道哪个是被测物、哪个是标定物；它会在模型里找到这个东西并据此定尺度，找不到会明说。"
+          }
+        }
+      }
+    },
+    "Bu cihazda fotoğraflara derinlik gömülemiyor — ölçek ancak kalibrasyon nesnesiyle veya sonradan kumpasla gelir.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This device can't embed depth in photos — scale can only come from the calibration object or a later caliper calibration."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这台设备无法给照片嵌入深度 — 尺度只能来自标定物或事后卡尺标定。"
+          }
+        }
+      }
+    },
+    "Ölçek için: 10 mm nesne yeşil çerçevenin içinde, objenin yanında mı?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "For scale: is the 10 mm object inside the green frame, next to the subject?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "为尺度确认：10mm 标定物在绿框里、贴着被测物吗？"
+          }
+        }
+      }
+    },
+    "Sarı çerçeveyi objenin üzerine yerleştir — sadece çerçevelerin içi modellenir, dışı kararır": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Place the yellow frame over the object — only the inside is modelled, the outside dims"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "把黄框套住被测物 — 只有框内会被建模，框外变暗"
+          }
+        }
+      }
+    },
+    "Sonraki: Kalibrasyon Nesnesini Belirle": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next: Designate the Calibration Object"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下一步：指定标定物"
+          }
+        }
+      }
+    },
+    "Kalibrasyon nesnesi yok — böyle çek": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No calibration object — shoot anyway"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有标定物 — 就这样拍"
+          }
+        }
+      }
+    },
+    "Yeşil çerçeveyi, objenin yanındaki 10 mm yüksekliğindeki küçük nesnenin üzerine yerleştir": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Place the green frame over the small 10 mm-tall object next to the subject"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "把绿框套住被测物旁边那个高 10mm 的小东西"
+          }
+        }
+      }
+    },
+    "Çekime Başla": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start Shooting"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开始拍摄"
+          }
+        }
+      }
+    },
+    "Geri — obje çerçevesine dön": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back — to the subject frame"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "返回 — 回到被测物框"
+          }
+        }
+      }
+    },
+    "Belirlenen kalibrasyon nesnesiyle ölçeklendi": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scaled by the designated calibration object"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已按指定标定物定尺度"
+          }
+        }
+      }
+    },
+    "Belirlenen nesne modelde aşınmış bulundu — ölçek derinlikten alındı": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The designated object came back eroded in the model — scale taken from depth"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "指定物在模型里只剩侵蚀残存 — 尺度已取自深度"
+          }
+        }
+      }
+    },
+    "Bulunan yükseklik: %.1f mm (gerçek 10 mm)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Found height: %.1f mm (real 10 mm)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "找到的高度：%.1f mm（真实 10 mm）"
+          }
+        }
+      }
+    },
+    "Belirlenen nesne beklenenden büyük bulundu — ölçek derinlikten alındı": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The designated object came back larger than expected — scale taken from depth"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "指定物比预期大 — 尺度已取自深度"
+          }
+        }
+      }
+    },
+    "Belirlenen kalibrasyon nesnesi modelde bulunamadı — ölçek derinlikten alındı": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The designated calibration object was not found in the model — scale taken from depth"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "模型里没找到指定标定物 — 尺度已取自深度"
+          }
+        }
+      }
+    },
+    "Belirlenen nesne": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Designated object"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "指定物"
+          }
+        }
+      }
+    },
+    "Bulunan yükseklik": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Found height"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "找到的高度"
+          }
+        }
+      }
+    },
+    "Kalibrasyon nesnesini (10 mm) objenin yanına koyup birlikte tarayın ve çekimden önce yeşil çerçeveyle belirleyin; uygulama onu mesh içinde bulup ölçeği ondan alır.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan the calibration object (10 mm) together with the object and designate it with the green frame before shooting; the app finds it in the mesh and takes the scale from it."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "把标定物（10mm）放在被测物旁边一起扫，拍摄前用绿框指定它；App 会在模型里找到它并据此定尺度。"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

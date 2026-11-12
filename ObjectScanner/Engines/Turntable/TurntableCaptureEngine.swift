@@ -86,6 +86,13 @@ final class TurntableCaptureEngine: ScanEngine {
     /// backdrop a metre away is a workaround for not having it.
     var objectMaskRect: CGRect?
 
+    /// The designated calibration object's region, in the same coordinates
+    /// (v0.7). Set when the user frames the 10 mm reference with the second
+    /// rectangle; the mask becomes the union of both regions, and the scale
+    /// audit searches the mesh guided by this designation. Nil when the
+    /// user skipped the designation step.
+    var calibratorMaskRect: CGRect?
+
     var session: AVCaptureSession? { coordinator?.session }
 
     var canFinish: Bool { shotCount >= Self.minimumShots }
@@ -160,6 +167,11 @@ final class TurntableCaptureEngine: ScanEngine {
 
         stopAutoCapture()
         coordinator.stop()
+        // In-flight captures must land before the images directory is
+        // enumerated for reconstruction: a photo still being processed
+        // would be missed by the solver, and the sharpness check could
+        // delete a file mid-enumeration (v0.7).
+        await coordinator.drainPendingCaptures(timeout: 10)
 
         guard shotCount > 0 else {
             phase = .failed(message: String(localized: "Hiç fotoğraf çekilmedi."))
@@ -183,6 +195,7 @@ final class TurntableCaptureEngine: ScanEngine {
                 workspace: workspace,
                 detail: .reduced,
                 maskRect: objectMaskRect,
+                extraMaskRect: calibratorMaskRect,
                 onWarning: { [weak self] note in
                     self?.warnings.append(note)
                 }
@@ -206,13 +219,34 @@ final class TurntableCaptureEngine: ScanEngine {
         let cubeHeightMM = UserDefaults.standard.object(forKey: "calibration.cubeHeightMM") as? Double ?? 10.0
         let modelURL = workspace.modelURL
         let hasDepth = deliversDepth
+        let designated = calibratorMaskRect != nil
         let outcome = await Task.detached(priority: .userInitiated) {
             TurntableScaleAnalyzer.analyze(
                 modelAt: modelURL,
                 isMetricallyScaled: hasDepth,
-                cubeRealHeightMillimetres: cubeHeightMM
+                cubeRealHeightMillimetres: cubeHeightMM,
+                designatedCalibrator: designated
             )
         }.value
+
+        // A designated calibrator that produced no audit trail at all (no
+        // depth prior to guide the search, mesh unreadable) still deserves
+        // a sentence on the result screen — silence would read as success.
+        if designated, outcome?.calibration == nil {
+            warnings.append(String(localized: "Belirlenen kalibrasyon nesnesi modelde bulunamadı — küple tekrar tarayın veya Galeri'den kumpasla kalibre edin."))
+        }
+
+        let designation: ScanDesignation? = objectMaskRect.map { subject in
+            ScanDesignation(
+                subjectRect: [
+                    Double(subject.minX), Double(subject.minY),
+                    Double(subject.width), Double(subject.height),
+                ],
+                calibratorRect: calibratorMaskRect.map {
+                    [Double($0.minX), Double($0.minY), Double($0.width), Double($0.height)]
+                }
+            )
+        }
 
         let record = ScanRecord(
             id: workspace.id,
@@ -226,7 +260,8 @@ final class TurntableCaptureEngine: ScanEngine {
             dimensionsMillimetres: outcome?.objectDimensionsMillimetres,
             detail: .reduced,
             summary: output.poses?.summaryText,
-            scaleCalibration: outcome?.calibration
+            scaleCalibration: outcome?.calibration,
+            designation: designation
         )
         storage.commit(record, workspace: workspace)
 

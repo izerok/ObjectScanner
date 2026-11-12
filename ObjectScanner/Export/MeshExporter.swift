@@ -71,12 +71,18 @@ enum MeshExporter {
     /// dropped into a slicer measures what the real object measures.
     /// `removingCubeFaces` drops the calibration cube's triangles from the
     /// geometry-only formats, where the cube would otherwise end up printed.
+    /// `guidedCubeHeightMillimetres` (v0.7) switches the removal to the
+    /// designation-guided search: for a guided scan the cube may be fused
+    /// onto the subject (an eroded remnant), which the blind component
+    /// search cannot see at all. The mesh is metric in that flow, so the
+    /// expected height in units is the real height over 1000.
     static func export(
         modelAt sourceURL: URL,
         as format: MeshExportFormat,
         namedLike baseName: String,
         millimetresPerUnit: Double? = nil,
-        removingCubeFaces: Bool = false
+        removingCubeFaces: Bool = false,
+        guidedCubeHeightMillimetres: Double? = nil
     ) async throws -> URL {
 
         guard FileManager.default.fileExists(atPath: sourceURL.path(percentEncoded: false)) else {
@@ -107,13 +113,15 @@ enum MeshExporter {
         // Geometry-only formats with a scale to bake (or a cube to remove)
         // are written directly: full control over units and triangles, and
         // no dependence on ModelIO's unit assumptions.
-        if format == .stl || format == .ply, millimetresPerUnit != nil || removingCubeFaces {
+        if format == .stl || format == .ply,
+           millimetresPerUnit != nil || removingCubeFaces || guidedCubeHeightMillimetres != nil {
             let written = await Task.detached(priority: .userInitiated) {
                 writeGeometryOnly(
                     sourceURL: sourceURL,
                     format: format,
                     millimetresPerUnit: millimetresPerUnit,
                     removingCubeFaces: removingCubeFaces,
+                    guidedCubeHeightMillimetres: guidedCubeHeightMillimetres,
                     destination: destination
                 )
             }.value
@@ -157,24 +165,35 @@ enum MeshExporter {
         format: MeshExportFormat,
         millimetresPerUnit: Double?,
         removingCubeFaces: Bool,
+        guidedCubeHeightMillimetres: Double?,
         destination: URL
     ) -> Bool {
         guard let geometry = MeshGeometry.load(from: sourceURL) else { return false }
 
         var faces: [(UInt32, UInt32, UInt32)] = []
         faces.reserveCapacity(geometry.indices.count / 3)
-        var cubeComponent: Int?
-        var componentOfFace: [Int] = []
-        if removingCubeFaces,
-           let segmentation = ScaleCalibrator.analyze(
-            positions: geometry.positions,
-            indices: geometry.indices
-           ) {
-            cubeComponent = segmentation.cubeComponent
-            componentOfFace = segmentation.componentOfFace
+        var dropFaces: Set<Int> = []
+        if removingCubeFaces {
+            if let guidedCubeHeightMillimetres,
+               let guided = GuidedCalibrator.analyze(
+                positions: geometry.positions,
+                indices: geometry.indices,
+                expectedHeightUnits: Float(guidedCubeHeightMillimetres / 1000.0)
+               ) {
+                // Located (found or eroded): exactly the faces the guided
+                // search attributed to the designated object.
+                dropFaces = guided.calibratorFaces
+            } else if let segmentation = ScaleCalibrator.analyze(
+                positions: geometry.positions,
+                indices: geometry.indices
+            ), let cubeComponent = segmentation.cubeComponent {
+                for (f, ci) in segmentation.componentOfFace.enumerated() where ci == cubeComponent {
+                    dropFaces.insert(f)
+                }
+            }
         }
         for f in 0 ..< geometry.indices.count / 3 {
-            if let cubeComponent, f < componentOfFace.count, componentOfFace[f] == cubeComponent {
+            if dropFaces.contains(f) {
                 continue
             }
             faces.append((

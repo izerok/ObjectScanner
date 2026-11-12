@@ -44,6 +44,13 @@ struct ScanRecord: Identifiable, Codable, Hashable, Sendable {
     /// before this existed still decode.
     var scaleCalibration: ScaleCalibration?
 
+    /// The framing-time designations for turntable scans (v0.7): which part
+    /// of the frame the user marked as the subject and which as the 10 mm
+    /// calibration object. Persisted so a library re-analysis can repeat
+    /// the guided search instead of falling back to blind cube-hunting.
+    /// Optional, so records written before this existed still decode.
+    var designation: ScanDesignation?
+
     /// True when the file is a mesh Quick Look can render. Point clouds are not,
     /// so the library has to fall back to a stats view instead of a preview.
     var isPreviewable: Bool {
@@ -62,7 +69,8 @@ struct ScanRecord: Identifiable, Codable, Hashable, Sendable {
         dimensionsMillimetres: [Int]? = nil,
         detail: ReconstructionDetail? = nil,
         summary: String? = nil,
-        scaleCalibration: ScaleCalibration? = nil
+        scaleCalibration: ScaleCalibration? = nil,
+        designation: ScanDesignation? = nil
     ) {
         self.id = id
         self.name = name
@@ -76,7 +84,18 @@ struct ScanRecord: Identifiable, Codable, Hashable, Sendable {
         self.detail = detail
         self.summary = summary
         self.scaleCalibration = scaleCalibration
+        self.designation = designation
     }
+}
+
+/// The user's framing-time designations, in capture-normalized coordinates
+/// (0…1, origin top-left — the same space the mask rectangles live in).
+struct ScanDesignation: Codable, Hashable, Sendable {
+    /// [x, y, width, height] of the subject rectangle.
+    var subjectRect: [Double]
+    /// [x, y, width, height] of the calibration-object rectangle, when the
+    /// user designated one. Nil means the scan ran subject-only.
+    var calibratorRect: [Double]?
 }
 
 /// Mesh density the model was reconstructed at.

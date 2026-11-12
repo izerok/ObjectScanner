@@ -147,6 +147,26 @@ final class PhotoCaptureCoordinator: NSObject, @unchecked Sendable {
         }
     }
 
+    /// Waits until every in-flight capture has been fully handled — file
+    /// written and sharpness judged — bounded by `timeout`.
+    ///
+    /// `stop()` only stops the session; photo processing continues on its
+    /// own. `finish()` enumerates the images directory for reconstruction,
+    /// so a capture still in flight at that point would either be missed
+    /// by the solver or deleted mid-enumeration by the sharpness check
+    /// (v0.7: drain before enumerating — the race was long-standing).
+    func drainPendingCaptures(timeout: TimeInterval) async {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            pendingLock.lock()
+            let pending = pendingCaptures.count
+            pendingLock.unlock()
+            if pending == 0 { return }
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        Self.logger.error("Kalan çekimler zaman aşımında boşaltılamadı")
+    }
+
     // MARK: - Locking
 
     /// Converges focus, exposure and white balance once, then freezes all three.
@@ -254,10 +274,14 @@ final class PhotoCaptureCoordinator: NSObject, @unchecked Sendable {
 
             let delegate = PhotoDelegate(destination: destination) { [weak self] result in
                 guard let self else { return }
+                // Handle first, unregister after: `drainPendingCaptures`
+                // reads an empty pending set as "every file is final", so
+                // the entry must outlive the handling itself (the sharpness
+                // check can still delete the file inside `handle`).
+                self.handle(result: result, index: index, destination: destination)
                 self.pendingLock.lock()
                 self.pendingCaptures[settingsID] = nil
                 self.pendingLock.unlock()
-                self.handle(result: result, index: index, destination: destination)
             }
 
             self.pendingLock.lock()

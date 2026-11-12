@@ -11,11 +11,13 @@ import Foundation
 /// which is why that mode relies on ARKit's bounding box instead.
 enum ObjectMaskBuilder {
 
-    /// - Parameter normalizedRect: region to keep, in 0…1 image coordinates with the
-    ///   origin at the top-left.
-    /// - Returns: a `kCVPixelFormatType_OneComponent8` buffer, 255 inside the region
-    ///   and 0 outside.
-    static func makeMask(width: Int, height: Int, normalizedRect: CGRect) -> CVPixelBuffer? {
+    /// - Parameter normalizedRects: regions to keep, in 0…1 image coordinates
+    ///   with the origin at the top-left. More than one since v0.7: the
+    ///   subject rectangle plus the designated calibration object's — the
+    ///   mask is their union, each region modelled, everything else not.
+    /// - Returns: a `kCVPixelFormatType_OneComponent8` buffer, 255 inside any
+    ///   of the regions and 0 outside.
+    static func makeMask(width: Int, height: Int, normalizedRects: [CGRect]) -> CVPixelBuffer? {
         var buffer: CVPixelBuffer?
         let attributes: [CFString: Any] = [
             kCVPixelBufferCGImageCompatibilityKey: false,
@@ -39,24 +41,24 @@ enum ObjectMaskBuilder {
         guard let base = CVPixelBufferGetBaseAddress(mask) else { return nil }
         let bytesPerRow = CVPixelBufferGetBytesPerRow(mask)
 
-        // Clamped so a rectangle dragged past the edge still produces a valid mask
-        // rather than writing outside the buffer.
-        let left = max(0, Int((normalizedRect.minX * CGFloat(width)).rounded()))
-        let right = min(width, Int((normalizedRect.maxX * CGFloat(width)).rounded()))
-        let top = max(0, Int((normalizedRect.minY * CGFloat(height)).rounded()))
-        let bottom = min(height, Int((normalizedRect.maxY * CGFloat(height)).rounded()))
+        // Clamped so a rectangle dragged past the edge still produces a valid
+        // mask rather than writing outside the buffer.
+        let spans: [(left: Int, right: Int, top: Int, bottom: Int)] = normalizedRects.map { rect in
+            (
+                left: max(0, Int((rect.minX * CGFloat(width)).rounded())),
+                right: min(width, Int((rect.maxX * CGFloat(width)).rounded())),
+                top: max(0, Int((rect.minY * CGFloat(height)).rounded())),
+                bottom: min(height, Int((rect.maxY * CGFloat(height)).rounded()))
+            )
+        }
 
         let pointer = base.assumingMemoryBound(to: UInt8.self)
 
         for row in 0..<height {
             let rowStart = pointer.advanced(by: row * bytesPerRow)
-            if row < top || row >= bottom {
-                rowStart.update(repeating: 0, count: width)
-            } else {
-                rowStart.update(repeating: 0, count: width)
-                if right > left {
-                    rowStart.advanced(by: left).update(repeating: 255, count: right - left)
-                }
+            rowStart.update(repeating: 0, count: width)
+            for span in spans where row >= span.top && row < span.bottom && span.right > span.left {
+                rowStart.advanced(by: span.left).update(repeating: 255, count: span.right - span.left)
             }
         }
 

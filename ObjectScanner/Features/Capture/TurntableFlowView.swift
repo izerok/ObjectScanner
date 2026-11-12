@@ -14,6 +14,17 @@ struct TurntableFlowView: View {
     /// Screen-space rectangle the user places over the object.
     @State private var maskFrame = CGRect(x: 80, y: 240, width: 220, height: 260)
 
+    /// Screen-space rectangle for the designated calibration object (v0.7),
+    /// placed in the second framing step. Starts beside the subject frame;
+    /// the user drags it onto the 10 mm reference.
+    @State private var calibratorFrame = CGRect(x: 312, y: 420, width: 80, height: 80)
+
+    /// Which framing step the capture stage is in. Designation comes before
+    /// shooting: the user first says what the subject is, then what the
+    /// calibration object is — identification by declaration, not by a
+    /// post-hoc search guessing which blob is which.
+    @State private var framingStage: FramingStage = .subject
+
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
@@ -81,18 +92,37 @@ struct TurntableFlowView: View {
     private func captureStage(engine: TurntableCaptureEngine) -> some View {
         ZStack {
             if let session = engine.session {
-                // The frame is reported back through a binding rather than read from
-                // the view: converting layer coordinates to capture coordinates needs
-                // the preview layer, which only this wrapper owns.
-                CameraPreviewView(session: session, maskFrame: maskFrame) { normalized in
-                    engine.objectMaskRect = normalized
+                // The frames are reported back through a binding rather than read
+                // from the view: converting layer coordinates to capture
+                // coordinates needs the preview layer, which only this wrapper
+                // owns. The calibrator frame joins the report once its step
+                // starts; going back to the subject step withdraws it.
+                CameraPreviewView(
+                    session: session,
+                    maskFrames: framingStage == .subject
+                        ? [maskFrame]
+                        : [maskFrame, calibratorFrame]
+                ) { normalized in
+                    engine.objectMaskRect = normalized.first
+                    engine.calibratorMaskRect = normalized.count > 1 ? normalized[1] : nil
                 }
                 .ignoresSafeArea()
             }
 
-            ObjectMaskRectangle(frame: $maskFrame)
+            DualMaskOverlay(
+                subjectFrame: $maskFrame,
+                calibratorFrame: $calibratorFrame,
+                stage: framingStage
+            )
 
-            TurntableOverlay(engine: engine) {
+            TurntableOverlay(
+                engine: engine,
+                framingStage: framingStage,
+                onFramingNext: { framingStage = .calibrator },
+                onFramingSkip: { framingStage = .shooting },
+                onFramingBack: { framingStage = .subject },
+                onFramingStart: { framingStage = .shooting }
+            ) {
                 engine.cancel()
                 dismiss()
             }
@@ -130,14 +160,14 @@ private struct TurntableSetupGuide: View {
                 // since solved just trains people to ignore the guide.
                 requirement(
                     String(localized: "Sarı çerçeveyi objenin üzerine yerleştir"),
-                    detail: String(localized: "Sürükleyerek taşı, iki parmakla boyutlandır. Sadece çerçevenin içi modellenir — masa, kâğıt ve arka plan tamamen dışlanır. Telefon sabit olduğu için tek çerçeve bütün kareler için geçerli."),
+                    detail: String(localized: "Bu ilk adım: sürükleyerek taşı, iki parmakla boyutlandır. Sadece çerçevelerin içi modellenir — masa, kâğıt ve arka plan tamamen dışlanır. Telefon sabit olduğu için çerçeveler bütün kareler için geçerli."),
                     systemImage: "viewfinder.rectangular",
                     isCritical: true
                 )
 
                 requirement(
-                    String(localized: "Gerçek boyut için kalibrasyon küpünü de çerçeveye al"),
-                    detail: String(localized: "10×10×10 mm küpü objenin yanına (1–2 cm) koy; sarı çerçevenin içinde kalsın. Uygulama küpü modelde bulup ölçeği ondan alır — derinlik ölçeğiyle de karşılaştırır."),
+                    String(localized: "İkinci adımda kalibrasyon nesnesini belirle"),
+                    detail: String(localized: "Yüksekliği 10 mm olan küçük bir nesneyi (küp, blok, üst üste para) objenin yanına (1–2 cm) koy. Çekimden önce yeşil çerçeveyi onun üzerine yerleştireceksin — uygulama hangisinin obje, hangisinin kalibrasyon nesnesi olduğunu böyle bilecek; modelde o nesneyi arayıp ölçeği ondan alacak, bulamazsa söyleyecek."),
                     systemImage: "cube",
                     isCritical: true
                 )
@@ -182,7 +212,7 @@ private struct TurntableSetupGuide: View {
 
                 if !deliversDepth {
                     Label(
-                        "Bu cihazda fotoğraflara derinlik gömülemiyor — ölçek ancak kalibrasyon küpüyle veya sonradan kumpasla gelir.",
+                        "Bu cihazda fotoğraflara derinlik gömülemiyor — ölçek ancak kalibrasyon nesnesiyle veya sonradan kumpasla gelir.",
                         systemImage: "ruler"
                     )
                     .font(.footnote)
@@ -230,8 +260,8 @@ private struct TurntableSetupGuide: View {
 
 private struct CameraPreviewView: UIViewRepresentable {
     let session: AVCaptureSession
-    let maskFrame: CGRect
-    let onMaskChange: (CGRect) -> Void
+    let maskFrames: [CGRect]
+    let onMaskChange: ([CGRect]) -> Void
 
     func makeUIView(context: Context) -> PreviewView {
         let view = PreviewView()
@@ -253,7 +283,7 @@ private struct CameraPreviewView: UIViewRepresentable {
     /// and every capture action dead-ends on "place the frame first"
     /// (v0.3.2: this was the pure-LiDAR mode's dead-button root cause).
     private func installReporter(on view: PreviewView) {
-        let maskFrame = self.maskFrame
+        let maskFrames = self.maskFrames
         let onMaskChange = self.onMaskChange
         view.reportMask = { [weak view] in
             // Only while genuinely on screen with a live session: reporting
@@ -267,16 +297,20 @@ private struct CameraPreviewView: UIViewRepresentable {
             // on-screen coordinates to the capture device's normalised space:
             // it accounts for `videoGravity` cropping and the preview's own
             // orientation, which hand-rolled arithmetic would get wrong.
-            let converted = view.previewLayer.metadataOutputRectConverted(fromLayerRect: maskFrame)
+            let converted = maskFrames.map {
+                view.previewLayer.metadataOutputRectConverted(fromLayerRect: $0)
+            }
             // Skip redundant reports: the consumer is an @Observable setter,
-            // and re-reporting an unchanged rect on every layout pass would
+            // and re-reporting unchanged rects on every layout pass would
             // churn view updates for nothing.
-            if let last = view.lastReportedMask,
-               abs(last.minX - converted.minX) < 0.0001, abs(last.minY - converted.minY) < 0.0001,
-               abs(last.width - converted.width) < 0.0001, abs(last.height - converted.height) < 0.0001 {
+            if let last = view.lastReportedMasks, last.count == converted.count,
+               zip(last, converted).allSatisfy({ a, b in
+                   abs(a.minX - b.minX) < 0.0001 && abs(a.minY - b.minY) < 0.0001
+                       && abs(a.width - b.width) < 0.0001 && abs(a.height - b.height) < 0.0001
+               }) {
                 return
             }
-            view.lastReportedMask = converted
+            view.lastReportedMasks = converted
             onMaskChange(converted)
         }
     }
@@ -290,7 +324,7 @@ private struct CameraPreviewView: UIViewRepresentable {
         var previewLayer: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
 
         var reportMask: (() -> Void)?
-        var lastReportedMask: CGRect?
+        var lastReportedMasks: [CGRect]?
         private var reportScheduled = false
 
         /// Reports are ALWAYS delivered on the next runloop turn, never
@@ -320,6 +354,11 @@ private struct CameraPreviewView: UIViewRepresentable {
 
 private struct TurntableOverlay: View {
     let engine: TurntableCaptureEngine
+    let framingStage: FramingStage
+    let onFramingNext: () -> Void
+    let onFramingSkip: () -> Void
+    let onFramingBack: () -> Void
+    let onFramingStart: () -> Void
     let onCancel: () -> Void
 
     @State private var isFinishing = false
@@ -330,9 +369,11 @@ private struct TurntableOverlay: View {
         VStack(spacing: 0) {
             topBar
             Spacer(minLength: 0)
-            if engine.shotCount == 0 {
+            if framingStage == .shooting, engine.shotCount == 0 {
                 Label(
-                    "Ölçek için: 10 mm küp çerçevenin içinde, objenin yanında mı?",
+                    engine.calibratorMaskRect != nil
+                        ? "Ölçek için: 10 mm nesne yeşil çerçevenin içinde, objenin yanında mı?"
+                        : "Ölçek için: 10 mm küp çerçevenin içinde, objenin yanında mı?",
                     systemImage: "cube"
                 )
                 .font(.caption)
@@ -358,7 +399,11 @@ private struct TurntableOverlay: View {
                     .background(.orange.opacity(0.9), in: Capsule())
                     .padding(.bottom, 10)
             }
-            actionBar
+            if framingStage == .shooting {
+                actionBar
+            } else {
+                framingBar
+            }
         }
         .padding(.horizontal)
         .padding(.bottom, 8)
@@ -420,6 +465,40 @@ private struct TurntableOverlay: View {
             .background(.black.opacity(0.4), in: Capsule())
         }
         .padding(.top, 4)
+    }
+
+    /// The two designation steps replace the capture controls until both
+    /// rectangles are placed: first the subject, then the calibration
+    /// object. Shooting controls with unplaced frames would invite exactly
+    /// the unlabelled scan this flow exists to prevent.
+    private var framingBar: some View {
+        VStack(spacing: 12) {
+            switch framingStage {
+            case .subject:
+                Text("Sarı çerçeveyi objenin üzerine yerleştir — sadece çerçevelerin içi modellenir, dışı kararır")
+                    .font(.footnote)
+                    .foregroundStyle(.white.opacity(0.85))
+                    .multilineTextAlignment(.center)
+                Button("Sonraki: Kalibrasyon Nesnesini Belirle", action: onFramingNext)
+                    .buttonStyle(TurntablePrimaryButton())
+                Button("Kalibrasyon nesnesi yok — böyle çek", action: onFramingSkip)
+                    .buttonStyle(TurntableSecondaryButton())
+            case .calibrator:
+                Text("Yeşil çerçeveyi, objenin yanındaki 10 mm yüksekliğindeki küçük nesnenin üzerine yerleştir")
+                    .font(.footnote)
+                    .foregroundStyle(.white.opacity(0.85))
+                    .multilineTextAlignment(.center)
+                Button("Çekime Başla", action: onFramingStart)
+                    .buttonStyle(TurntablePrimaryButton())
+                Button("Geri — obje çerçevesine dön", action: onFramingBack)
+                    .buttonStyle(TurntableSecondaryButton())
+            case .shooting:
+                EmptyView()
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(16)
+        .background(.black.opacity(0.42), in: RoundedRectangle(cornerRadius: 22))
     }
 
     private var actionBar: some View {
@@ -605,6 +684,47 @@ private struct TurntableResultView: View {
                             .foregroundStyle(discrepancy > 3 ? .orange : .secondary)
                     }
                 }
+                if let calibration = record.scaleCalibration,
+                   calibration.method == .guidedCube {
+                    switch calibration.designatedOutcome {
+                    case .found:
+                        Text("Belirlenen kalibrasyon nesnesiyle ölçeklendi")
+                            .font(.caption)
+                            .foregroundStyle(.green)
+                        if let discrepancy = calibration.discrepancyPercent {
+                            Text("\(String(localized: "Derinlikle uyuşmazlık")): \(String(format: "%.1f%%", discrepancy))")
+                                .font(.caption)
+                                .foregroundStyle(discrepancy > 3 ? .orange : .secondary)
+                        }
+                    case .eroded:
+                        Text("Belirlenen nesne modelde aşınmış bulundu — ölçek derinlikten alındı")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                            .multilineTextAlignment(.center)
+                        if let located = calibration.locatedHeightMillimetres {
+                            Text(String(format: String(localized: "Bulunan yükseklik: %.1f mm (gerçek 10 mm)"), located))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    case .oversized:
+                        Text("Belirlenen nesne beklenenden büyük bulundu — ölçek derinlikten alındı")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                            .multilineTextAlignment(.center)
+                        if let located = calibration.locatedHeightMillimetres {
+                            Text(String(format: String(localized: "Bulunan yükseklik: %.1f mm (gerçek 10 mm)"), located))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    case .notFound:
+                        Text("Belirlenen kalibrasyon nesnesi modelde bulunamadı — ölçek derinlikten alındı")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                            .multilineTextAlignment(.center)
+                    case nil:
+                        EmptyView()
+                    }
+                }
             }
 
             ForEach(warnings, id: \.self) { warning in
@@ -670,73 +790,137 @@ private struct TurntableSecondaryButton: ButtonStyle {
     }
 }
 
-/// Draggable, pinchable rectangle marking the object.
-private struct ObjectMaskRectangle: View {
-    @Binding var frame: CGRect
+/// Which designation step the capture stage is in (v0.7).
+private enum FramingStage {
+    /// Placing the yellow subject rectangle.
+    case subject
+    /// Placing the green calibration-object rectangle.
+    case calibrator
+    /// Both placed (or designation skipped) — shooting.
+    case shooting
+}
 
-    @State private var dragOffset = CGSize.zero
-    @State private var scale: CGFloat = 1
+/// The designation rectangles (v0.7): yellow for the subject, green for the
+/// 10 mm calibration object, over one shared dim layer.
+///
+/// The dim is the union of both rectangles — what stays lit gets modelled —
+/// and it tracks both rectangles' in-flight gestures, so a calibration
+/// object left outside reads as excluded *before* the scan starts, not
+/// after a finished model comes back without it (the v0.6.6 lesson,
+/// extended to two frames). Only the current step's rectangle takes
+/// gestures; while shooting both are locked.
+private struct DualMaskOverlay: View {
+    @Binding var subjectFrame: CGRect
+    @Binding var calibratorFrame: CGRect
+    let stage: FramingStage
 
-    private var displayed: CGRect {
+    @State private var subjectDrag = CGSize.zero
+    @State private var subjectScale: CGFloat = 1
+    @State private var calibratorDrag = CGSize.zero
+    @State private var calibratorScale: CGFloat = 1
+
+    private func displayed(_ frame: CGRect, drag: CGSize, scale: CGFloat) -> CGRect {
         let width = frame.width * scale
         let height = frame.height * scale
         return CGRect(
-            x: frame.midX - width / 2 + dragOffset.width,
-            y: frame.midY - height / 2 + dragOffset.height,
+            x: frame.midX - width / 2 + drag.width,
+            y: frame.midY - height / 2 + drag.height,
             width: width,
             height: height
         )
     }
 
+    private var displayedSubject: CGRect {
+        displayed(subjectFrame, drag: subjectDrag, scale: subjectScale)
+    }
+
+    private var displayedCalibrator: CGRect {
+        displayed(calibratorFrame, drag: calibratorDrag, scale: calibratorScale)
+    }
+
+    private var showsCalibrator: Bool { stage != .subject }
+
     var body: some View {
         GeometryReader { proxy in
             ZStack {
-                // Live "what gets modelled" preview (v0.6.6): everything
-                // outside the frame is dimmed, tracking the drag/scale
-                // gestures through `displayed`, so a calibration cube left
-                // outside reads as excluded *before* the scan starts —
-                // not after a finished model comes back without it.
                 Path { path in
                     path.addRect(CGRect(origin: .zero, size: proxy.size))
-                    path.addRect(displayed)
+                    path.addRect(displayedSubject)
+                    if showsCalibrator {
+                        path.addRect(displayedCalibrator)
+                    }
                 }
                 .fill(Color.black.opacity(0.55), style: FillStyle(eoFill: true))
                 .allowsHitTesting(false)
 
-                Rectangle()
-                .stroke(.yellow, style: StrokeStyle(lineWidth: 2, dash: [8, 5]))
-                .background(Color.yellow.opacity(0.06))
-                .frame(width: displayed.width, height: displayed.height)
-                .position(x: displayed.midX, y: displayed.midY)
-                .overlay(alignment: .topLeading) {
-                    Text("obje")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.black)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
-                        .background(.yellow, in: Capsule())
-                        .position(x: displayed.minX + 22, y: displayed.minY - 10)
+                designationRect(
+                    rect: displayedSubject,
+                    color: .yellow,
+                    label: String(localized: "obje"),
+                    editable: stage == .subject,
+                    drag: $subjectDrag,
+                    scale: $subjectScale
+                ) {
+                    subjectFrame = displayedSubject
+                    subjectDrag = .zero
+                    subjectScale = 1
                 }
-                .gesture(
-                    DragGesture()
-                        .onChanged { dragOffset = $0.translation }
-                        .onEnded { _ in
-                            frame = displayed
-                            dragOffset = .zero
-                            scale = 1
-                        }
-                )
-                .simultaneousGesture(
-                    MagnifyGesture()
-                        .onChanged { scale = $0.magnification }
-                        .onEnded { _ in
-                            frame = displayed
-                            dragOffset = .zero
-                            scale = 1
-                        }
-                )
+
+                if showsCalibrator {
+                    designationRect(
+                        rect: displayedCalibrator,
+                        color: .green,
+                        label: "10 mm",
+                        editable: stage == .calibrator,
+                        drag: $calibratorDrag,
+                        scale: $calibratorScale
+                    ) {
+                        calibratorFrame = displayedCalibrator
+                        calibratorDrag = .zero
+                        calibratorScale = 1
+                    }
+                }
             }
         }
-        .allowsHitTesting(true)
+    }
+
+    @ViewBuilder
+    private func designationRect(
+        rect: CGRect,
+        color: Color,
+        label: String,
+        editable: Bool,
+        drag: Binding<CGSize>,
+        scale: Binding<CGFloat>,
+        commit: @escaping () -> Void
+    ) -> some View {
+        Rectangle()
+            .stroke(color, style: StrokeStyle(lineWidth: 2, dash: [8, 5]))
+            .background(color.opacity(0.06))
+            .frame(width: rect.width, height: rect.height)
+            .position(x: rect.midX, y: rect.midY)
+            .overlay(alignment: .topLeading) {
+                Text(label)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(color, in: Capsule())
+                    .position(x: rect.minX + 22, y: rect.minY - 10)
+            }
+            .gesture(
+                editable
+                    ? DragGesture()
+                        .onChanged { drag.wrappedValue = $0.translation }
+                        .onEnded { _ in commit() }
+                    : nil
+            )
+            .simultaneousGesture(
+                editable
+                    ? MagnifyGesture()
+                        .onChanged { scale.wrappedValue = $0.magnification }
+                        .onEnded { _ in commit() }
+                    : nil
+            )
     }
 }

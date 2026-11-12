@@ -333,6 +333,9 @@ struct ScanDetailView: View {
         Section {
             if let calibration = record.scaleCalibration {
                 LabeledContent("Kalibrasyon yöntemi", value: calibration.method.displayName)
+                if let outcome = calibration.designatedOutcome {
+                    LabeledContent("Belirlenen nesne", value: outcome.displayName)
+                }
                 if let depth = calibration.depthDimensionsMillimetres, depth.count == 3 {
                     LabeledContent("Derinlik boyutu", value: Self.formatDimensions(depth))
                 }
@@ -345,7 +348,15 @@ struct ScanDetailView: View {
                         value: String(format: "%.1f%%", discrepancy)
                     )
                 }
-                if let fitted = calibration.cubeHeightUnits,
+                if calibration.method == .guidedCube,
+                   let located = calibration.locatedHeightMillimetres {
+                    LabeledContent(
+                        "Bulunan yükseklik",
+                        value: String(format: "%.1f mm", located)
+                    )
+                }
+                if calibration.method != .guidedCube,
+                   let fitted = calibration.cubeHeightUnits,
                    let real = calibration.cubeRealHeightMillimetres {
                     LabeledContent(
                         "Küp yüksekliği",
@@ -399,7 +410,7 @@ struct ScanDetailView: View {
         } header: {
             Text("Ölçek kalibrasyonu")
         } footer: {
-            Text("Küpü objenin yanına koyup birlikte tarayın; uygulama küpü mesh içinde bulup ölçeği ondan alır.")
+            Text("Kalibrasyon nesnesini (10 mm) objenin yanına koyup birlikte tarayın ve çekimden önce yeşil çerçeveyle belirleyin; uygulama onu mesh içinde bulup ölçeği ondan alır.")
         }
     }
 
@@ -415,12 +426,14 @@ struct ScanDetailView: View {
         isAnalyzing = true
         let url = storage.modelURL(for: record)
         let hasDepth = meshHasDepthScale(record)
+        let designated = record.designation?.calibratorRect != nil
         Task {
             let outcome = await Task.detached(priority: .userInitiated) {
                 TurntableScaleAnalyzer.analyze(
                     modelAt: url,
                     isMetricallyScaled: hasDepth,
-                    cubeRealHeightMillimetres: cubeHeight
+                    cubeRealHeightMillimetres: cubeHeight,
+                    designatedCalibrator: designated
                 )
             }.value
             isAnalyzing = false
@@ -451,11 +464,13 @@ struct ScanDetailView: View {
             var units = record.scaleCalibration?.objectDimensionsUnits
             var baseCalibration = record.scaleCalibration
             if units == nil {
+                let designated = record.designation?.calibratorRect != nil
                 let outcome = await Task.detached(priority: .userInitiated) {
                     TurntableScaleAnalyzer.analyze(
                         modelAt: url,
                         isMetricallyScaled: hasDepth,
-                        cubeRealHeightMillimetres: cubeHeight
+                        cubeRealHeightMillimetres: cubeHeight,
+                        designatedCalibrator: designated
                     )
                 }.value
                 units = outcome?.objectDimensionsUnits
@@ -608,6 +623,12 @@ struct ScanDetailView: View {
         let factor = exportMillimetresPerUnit(for: record)
         let removeCube = record.engine == .turntable
             && record.scaleCalibration?.cubeHeightUnits != nil
+        // Guided scans remove the designated object's faces through the
+        // guided search — the blind component search cannot see a remnant
+        // fused onto the subject.
+        let guidedCubeHeight = record.scaleCalibration?.method == .guidedCube
+            ? (record.scaleCalibration?.cubeRealHeightMillimetres ?? 10.0)
+            : nil
         Task {
             do {
                 shareableURL = try await MeshExporter.export(
@@ -615,7 +636,8 @@ struct ScanDetailView: View {
                     as: exportFormat,
                     namedLike: record.name,
                     millimetresPerUnit: factor,
-                    removingCubeFaces: removeCube
+                    removingCubeFaces: removeCube,
+                    guidedCubeHeightMillimetres: guidedCubeHeight
                 )
             } catch {
                 errorMessage = error.localizedDescription
