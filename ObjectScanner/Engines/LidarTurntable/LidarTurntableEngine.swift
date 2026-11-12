@@ -566,8 +566,38 @@ enum MeshFileWriter {
             }
         }
         let objURL = directory.appending(path: "model.obj", directoryHint: .notDirectory)
-        try writeAsset(mesh: mesh, to: objURL)
-        return "model.obj"
+        do {
+            try writeAsset(mesh: mesh, to: objURL)
+            return "model.obj"
+        } catch {
+            // ModelIO itself is the failure (MDLErrorDomain 0 on device):
+            // fall back to a hand-written OBJ, which cannot fail in any way
+            // ModelIO can (v0.3.4).
+            try writeOBJManually(mesh: mesh, to: objURL)
+            return "model.obj"
+        }
+    }
+
+    /// Plain-text OBJ: vertices, normals, faces. Deliberately primitive —
+    /// this is the tier that exists for when the platform refuses to help.
+    private static func writeOBJManually(mesh: SurfaceNets.Mesh, to url: URL) throws {
+        var text = "# ObjectScanner pure-LiDAR turntable\n"
+        text.reserveCapacity(mesh.vertices.count * 48 + mesh.indices.count * 8)
+        for vertex in mesh.vertices {
+            text += "v \(vertex.x) \(vertex.y) \(vertex.z)\n"
+        }
+        for normal in mesh.normals {
+            text += "vn \(normal.x) \(normal.y) \(normal.z)\n"
+        }
+        var i = 0
+        while i + 2 < mesh.indices.count {
+            let a = mesh.indices[i] + 1
+            let b = mesh.indices[i + 1] + 1
+            let c = mesh.indices[i + 2] + 1
+            text += "f \(a)//\(a) \(b)//\(b) \(c)//\(c)\n"
+            i += 3
+        }
+        try text.write(to: url, atomically: true, encoding: .utf8)
     }
 
     private static func writeAsset(mesh: SurfaceNets.Mesh, to url: URL) throws {

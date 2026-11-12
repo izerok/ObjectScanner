@@ -249,14 +249,33 @@ struct CameraPreviewView: UIViewRepresentable {
         let maskFrame = self.maskFrame
         let onMaskChange = self.onMaskChange
         view.reportMask = { [weak view] in
-            guard let view, view.bounds.width > 0, view.bounds.height > 0 else { return }
+            // Only while genuinely on screen with a live session: reporting
+            // during teardown (the capture stage is dismantled the moment
+            // reconstruction starts) pokes a half-dead preview layer and
+            // crashed the photogrammetry turntable's finish (v0.3.4).
+            guard let view, view.window != nil,
+                  view.bounds.width > 0, view.bounds.height > 0,
+                  view.previewLayer.session != nil else { return }
             // `metadataOutputRectConverted` is the only correct way to go from
             // on-screen coordinates to the capture device's normalised space:
             // it accounts for `videoGravity` cropping and the preview's own
             // orientation, which hand-rolled arithmetic would get wrong.
             let converted = view.previewLayer.metadataOutputRectConverted(fromLayerRect: maskFrame)
+            // Skip redundant reports: the consumer is an @Observable setter,
+            // and re-reporting an unchanged rect on every layout pass would
+            // churn view updates for nothing.
+            if let last = view.lastReportedMask,
+               abs(last.minX - converted.minX) < 0.0001, abs(last.minY - converted.minY) < 0.0001,
+               abs(last.width - converted.width) < 0.0001, abs(last.height - converted.height) < 0.0001 {
+                return
+            }
+            view.lastReportedMask = converted
             onMaskChange(converted)
         }
+    }
+
+    static func dismantleUIView(_ view: PreviewView, coordinator: ()) {
+        view.reportMask = nil
     }
 
     final class PreviewView: UIView {
@@ -264,6 +283,7 @@ struct CameraPreviewView: UIViewRepresentable {
         var previewLayer: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
 
         var reportMask: (() -> Void)?
+        var lastReportedMask: CGRect?
 
         override func layoutSubviews() {
             super.layoutSubviews()
