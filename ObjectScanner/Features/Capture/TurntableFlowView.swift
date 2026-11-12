@@ -230,22 +230,45 @@ struct CameraPreviewView: UIViewRepresentable {
         let view = PreviewView()
         view.previewLayer.session = session
         view.previewLayer.videoGravity = .resizeAspectFill
+        installReporter(on: view)
         return view
     }
 
     func updateUIView(_ view: PreviewView, context: Context) {
-        // `metadataOutputRectConverted` is the only correct way to go from on-screen
-        // coordinates to the capture device's normalised space: it accounts for
-        // `videoGravity` cropping and the preview's own orientation, which hand-rolled
-        // arithmetic would get wrong.
-        guard view.bounds.width > 0, view.bounds.height > 0 else { return }
-        let converted = view.previewLayer.metadataOutputRectConverted(fromLayerRect: maskFrame)
-        onMaskChange(converted)
+        installReporter(on: view)
+        view.reportMask?()
+    }
+
+    /// Reports the mask in capture coordinates. Called on every update *and*
+    /// from `layoutSubviews` — the update path alone is not enough: the
+    /// first update can land before the view has bounds, and if nothing in
+    /// the parent re-renders afterwards, the engine never learns the mask
+    /// and every capture action dead-ends on "place the frame first"
+    /// (v0.3.2: this was the pure-LiDAR mode's dead-button root cause).
+    private func installReporter(on view: PreviewView) {
+        let maskFrame = self.maskFrame
+        let onMaskChange = self.onMaskChange
+        view.reportMask = { [weak view] in
+            guard let view, view.bounds.width > 0, view.bounds.height > 0 else { return }
+            // `metadataOutputRectConverted` is the only correct way to go from
+            // on-screen coordinates to the capture device's normalised space:
+            // it accounts for `videoGravity` cropping and the preview's own
+            // orientation, which hand-rolled arithmetic would get wrong.
+            let converted = view.previewLayer.metadataOutputRectConverted(fromLayerRect: maskFrame)
+            onMaskChange(converted)
+        }
     }
 
     final class PreviewView: UIView {
         override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
         var previewLayer: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
+
+        var reportMask: (() -> Void)?
+
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            reportMask?()
+        }
     }
 }
 
