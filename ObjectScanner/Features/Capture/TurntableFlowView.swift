@@ -689,8 +689,21 @@ private struct ObjectMaskRectangle: View {
     }
 
     var body: some View {
-        GeometryReader { _ in
-            Rectangle()
+        GeometryReader { proxy in
+            ZStack {
+                // Live "what gets modelled" preview (v0.6.6): everything
+                // outside the frame is dimmed, tracking the drag/scale
+                // gestures through `displayed`, so a calibration cube left
+                // outside reads as excluded *before* the scan starts —
+                // not after a finished model comes back without it.
+                Path { path in
+                    path.addRect(CGRect(origin: .zero, size: proxy.size))
+                    path.addRect(displayed)
+                }
+                .fill(Color.black.opacity(0.55), style: FillStyle(eoFill: true))
+                .allowsHitTesting(false)
+
+                Rectangle()
                 .stroke(.yellow, style: StrokeStyle(lineWidth: 2, dash: [8, 5]))
                 .background(Color.yellow.opacity(0.06))
                 .frame(width: displayed.width, height: displayed.height)
@@ -722,6 +735,7 @@ private struct ObjectMaskRectangle: View {
                             scale = 1
                         }
                 )
+            }
         }
         .allowsHitTesting(true)
     }
