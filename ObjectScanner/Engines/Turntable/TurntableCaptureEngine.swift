@@ -192,16 +192,33 @@ final class TurntableCaptureEngine: ScanEngine {
             warnings.append(contentsOf: poses.advice)
         }
 
+        // Scale audit: look for the calibration cube in the mesh and
+        // reconcile its scale against the depth scale. Runs off the main
+        // actor; a failure here must never fail the scan itself.
+        let cubeHeightMM = UserDefaults.standard.object(forKey: "calibration.cubeHeightMM") as? Double ?? 10.0
+        let modelURL = workspace.modelURL
+        let hasDepth = deliversDepth
+        let outcome = await Task.detached(priority: .userInitiated) {
+            TurntableScaleAnalyzer.analyze(
+                modelAt: modelURL,
+                isMetricallyScaled: hasDepth,
+                cubeRealHeightMillimetres: cubeHeightMM
+            )
+        }.value
+
         let record = ScanRecord(
             id: workspace.id,
             name: Self.defaultName(for: Date()),
             engine: Self.kind,
-            // Scale comes from the depth embedded in each still. Without a LiDAR
-            // device there is none, and claiming real dimensions would be a lie.
-            isMetricallyScaled: deliversDepth,
+            // Scale comes from the depth embedded in each still — or, failing
+            // that, from the calibration cube measured in the mesh. Without
+            // either there is none, and claiming real dimensions would be a lie.
+            isMetricallyScaled: deliversDepth || outcome?.calibration != nil,
             imageCount: capturedShots,
+            dimensionsMillimetres: outcome?.objectDimensionsMillimetres,
             detail: .reduced,
-            summary: output.poses?.summaryText
+            summary: output.poses?.summaryText,
+            scaleCalibration: outcome?.calibration
         )
         storage.commit(record, workspace: workspace)
 

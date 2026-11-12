@@ -509,6 +509,17 @@ private struct TurntableResultView: View {
                         .font(.caption)
                         .foregroundStyle(.orange)
                 }
+                if let calibration = record.scaleCalibration,
+                   calibration.method == .visualCube {
+                    Text("Kalibrasyon küpüyle ölçeklendi")
+                        .font(.caption)
+                        .foregroundStyle(.green)
+                    if let discrepancy = calibration.discrepancyPercent {
+                        Text("\(String(localized: "Derinlikle uyuşmazlık")): \(String(format: "%.1f%%", discrepancy))")
+                            .font(.caption)
+                            .foregroundStyle(discrepancy > 3 ? .orange : .secondary)
+                    }
+                }
             }
 
             ForEach(warnings, id: \.self) { warning in

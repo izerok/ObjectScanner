@@ -99,6 +99,14 @@ final class ScanStorage {
         directoryURL(for: record).appending(path: record.modelFileName, directoryHint: .notDirectory)
     }
 
+    /// Replaces a stored record (same id) — used when a scan's calibration
+    /// is recomputed or a caliper value is applied after the fact.
+    func update(_ record: ScanRecord) {
+        guard let index = scans.firstIndex(where: { $0.id == record.id }) else { return }
+        scans[index] = record
+        persist()
+    }
+
     func rename(_ record: ScanRecord, to name: String) {
         guard let index = scans.firstIndex(of: record) else { return }
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)

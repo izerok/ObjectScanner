@@ -494,6 +494,22 @@
         }
       }
     },
+    "Aktif oturum yok.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No active session."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有进行中的会话。"
+          }
+        }
+      }
+    },
     "Algılama başlamadı. Cihazı objeye doğrultup tekrar deneyin.": {
       "extractionState": "manual",
       "localizations": {
@@ -698,6 +714,22 @@
         }
       }
     },
+    "Arka plan sade olursa yine iyi olur": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A plain background works well too"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "背景简单纯色也很好"
+          }
+        }
+      }
+    },
     "Arşiv yazılamadı.": {
       "extractionState": "manual",
       "localizations": {
@@ -749,6 +781,22 @@
         }
       }
     },
+    "Bilinmeyen sebep": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unknown reason"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未知原因"
+          }
+        }
+      }
+    },
     "Bir tur doldu — telefonun yüksekliğini veya açısını değiştirip bir tur daha çek": {
       "extractionState": "manual",
       "localizations": {
@@ -779,6 +827,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "一圈不够——换个高度"
+          }
+        }
+      }
+    },
+    "Bir turu tamamla": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Complete one full loop"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完整走完一圈"
           }
         }
       }
@@ -1106,6 +1170,23 @@
         }
       }
     },
+    "Bu tarama ölçeksiz. Kalibrasyon küpüyle tarayın veya kumpasla kalibre edin.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This scan has no scale. Scan with a calibration cube, or calibrate with a caliper."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此扫描无尺度。请带标定块重扫，或用卡尺标定。"
+          }
+        }
+      }
+    },
     "Bu üç cevap hangi sensörün doğru olduğunu belirler. En kritik olan desen: fotogrametri geometriyi yüzey deseninden üretir.": {
       "extractionState": "manual",
       "localizations": {
@@ -1306,6 +1387,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "实验性功能。摄影测量从表面细节生成几何形状，在光秃秃的粉刷墙面上表现差，在有家具、纹理丰富的房间里表现好。而且房间模型之后还要多处理几分钟。"
+          }
+        }
+      }
+    },
+    "Derinlik boyutu": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Depth-scale size"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "深度尺度三围"
+          }
+        }
+      }
+    },
+    "Derinlikle uyuşmazlık": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Discrepancy vs depth"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "与深度互校差"
           }
         }
       }
@@ -1548,6 +1663,40 @@
         }
       }
     },
+    "Dışa aktarma birimi: STL/OBJ/PLY milimetre, USDZ metre — ölçek gömülüdür.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export units: STL/OBJ/PLY in millimetres, USDZ in metres — the scale is baked in."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导出单位：STL/OBJ/PLY 为毫米、USDZ 为米 — 比例已烘焙。"
+          }
+        }
+      }
+    },
+    "En uzun kenar (mm)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Longest edge (mm)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最长边（毫米）"
+          }
+        }
+      }
+    },
     "Etrafında dönerken ışık objeye göre sabit kalır. Objeyi çevirdiğinde gölge yüzeyin üzerinde kayar ve çözücü aynı noktayı iki karede tanıyamaz. Tek lamba yerine dağınık ışık kullan; mümkünse lambayı objeyle birlikte döndür.": {
       "extractionState": "manual",
       "localizations": {
@@ -1765,6 +1914,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "隐藏"
+          }
+        }
+      }
+    },
+    "Görsel boyut": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Visual-scale size"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "视觉尺度三围"
           }
         }
       }
@@ -2071,6 +2237,74 @@
           "stringUnit": {
             "state": "translated",
             "value": "保持开灯"
+          }
+        }
+      }
+    },
+    "Kalibrasyon küpü (görsel)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calibration cube (visual)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "标定块（视觉）"
+          }
+        }
+      }
+    },
+    "Kalibrasyon küpüyle ölçeklendi": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scaled with the calibration cube"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已按标定块标定"
+          }
+        }
+      }
+    },
+    "Kalibrasyon yöntemi": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calibration method"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "标定方式"
+          }
+        }
+      }
+    },
+    "Kalibre edilmemiş dışa aktarma özgün birimdedir; boyutlar yanlış olabilir.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "An uncalibrated export keeps the original units; dimensions may be wrong."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未标定的导出保持原始单位，尺寸可能不对。"
           }
         }
       }
@@ -2449,6 +2683,57 @@
         }
       }
     },
+    "Kumpas (tek boyut)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Caliper (one dimension)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "卡尺（一维）"
+          }
+        }
+      }
+    },
+    "Kumpas değeri": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Caliper value"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "卡尺值"
+          }
+        }
+      }
+    },
+    "Kumpasla kalibre et": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calibrate with caliper"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用卡尺标定"
+          }
+        }
+      }
+    },
     "Kutuyu Sıfırla": {
       "extractionState": "manual",
       "localizations": {
@@ -2462,6 +2747,57 @@
           "stringUnit": {
             "state": "translated",
             "value": "重置框选"
+          }
+        }
+      }
+    },
+    "Küp gerçek yüksekliği (mm)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cube real height (mm)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "标定块实测高度（毫米）"
+          }
+        }
+      }
+    },
+    "Küp yüksekliği": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cube height"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "标定块高度"
+          }
+        }
+      }
+    },
+    "Küpü objenin yanına koyup birlikte tarayın; uygulama küpü mesh içinde bulup ölçeği ondan alır.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Place the cube next to the object and scan them together; the app finds the cube in the mesh and takes the scale from it."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "把标定块放在物体旁边一起扫描；App 会在网格中找到它并据此定尺度。"
           }
         }
       }
@@ -2547,6 +2883,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "LiDAR 量程约 5 米。贴墙太近它看不到整个表面，离太远测量会变弱。"
+          }
+        }
+      }
+    },
+    "LiDAR sahne mesh'i": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "LiDAR scene mesh"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "LiDAR 场景网格"
           }
         }
       }
@@ -4098,6 +4450,22 @@
         }
       }
     },
+    "Tek seferde tek oda": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "One room at a time"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一次只扫一个房间"
+          }
+        }
+      }
+    },
     "Tek seferde tek oda. Ev için odaları ayrı ayrı tarayın.": {
       "extractionState": "manual",
       "localizations": {
@@ -4149,6 +4517,22 @@
         }
       }
     },
+    "Telefon sabit dursun": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep the phone still"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "让手机保持固定"
+          }
+        }
+      }
+    },
     "Telefonu duvara doğru tut, yavaşça süpür": {
       "extractionState": "manual",
       "localizations": {
@@ -4162,6 +4546,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "把手机对着墙，慢慢扫过"
+          }
+        }
+      }
+    },
+    "Telefoto kamera": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telephoto camera"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "长焦相机"
           }
         }
       }
@@ -4434,6 +4834,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "新拍一圈"
+          }
+        }
+      }
+    },
+    "Yeniden hesapla": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recalculate"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新对账"
           }
         }
       }
@@ -4948,6 +5365,57 @@
         }
       }
     },
+    "Ölçek derinlikten geliyor; kalibrasyon küpü bulunamadı.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scale comes from depth; no calibration cube was found."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尺度来自深度；未找到标定块。"
+          }
+        }
+      }
+    },
+    "Ölçek kalibrasyonu": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scale calibration"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尺寸标定"
+          }
+        }
+      }
+    },
+    "Ölçek uyuşmazlığı": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scale discrepancy"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "互校差"
+          }
+        }
+      }
+    },
     "Ölçeksiz": {
       "extractionState": "manual",
       "localizations": {
@@ -5182,134 +5650,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "目前扫到的房间将被删除。"
-          }
-        }
-      }
-    },
-    "Arka plan sade olursa yine iyi olur": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "A plain background works well too"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "背景简单纯色也很好"
-          }
-        }
-      }
-    },
-    "Telefon sabit dursun": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Keep the phone still"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "让手机保持固定"
-          }
-        }
-      }
-    },
-    "Bir turu tamamla": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Complete one full loop"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "完整走完一圈"
-          }
-        }
-      }
-    },
-    "Tek seferde tek oda": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "One room at a time"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "一次只扫一个房间"
-          }
-        }
-      }
-    },
-    "LiDAR sahne mesh'i": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "LiDAR scene mesh"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "LiDAR 场景网格"
-          }
-        }
-      }
-    },
-    "Telefoto kamera": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Telephoto camera"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "长焦相机"
-          }
-        }
-      }
-    },
-    "Bilinmeyen sebep": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Unknown reason"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "未知原因"
-          }
-        }
-      }
-    },
-    "Aktif oturum yok.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No active session."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "没有进行中的会话。"
           }
         }
       }

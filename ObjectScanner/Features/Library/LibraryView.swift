@@ -213,6 +213,9 @@ struct ScanDetailView: View {
     @State private var isBundling = false
     @State private var errorMessage: String?
     @State private var draftName = ""
+    @State private var cubeHeightText = ""
+    @State private var caliperText = ""
+    @State private var isAnalyzing = false
 
     private var record: ScanRecord? {
         storage.scans.first { $0.id == recordID }
@@ -271,6 +274,10 @@ struct ScanDetailView: View {
                 }
             }
 
+            if record.engine == .turntable {
+                calibrationSection(for: record)
+            }
+
             exportSection(for: record)
 
             if storage.hasIntermediates(for: record) {
@@ -294,7 +301,193 @@ struct ScanDetailView: View {
         } message: {
             Text(errorMessage ?? "")
         }
-        .onAppear { draftName = record.name }
+        .onAppear {
+            draftName = record.name
+            let stored = UserDefaults.standard.object(forKey: "calibration.cubeHeightMM") as? Double
+            let cubeHeight = record.scaleCalibration?.cubeRealHeightMillimetres ?? stored ?? 10.0
+            cubeHeightText = Self.trimmedNumber(cubeHeight)
+        }
+    }
+
+    // MARK: - Scale calibration
+
+    private static func trimmedNumber(_ value: Double) -> String {
+        value == value.rounded() ? String(Int(value)) : String(value)
+    }
+
+    private static func formatDimensions(_ dims: [Double]) -> String {
+        dims.map { String(format: "%.1f", $0) }.joined(separator: " × ") + " mm"
+    }
+
+    /// Whether the mesh itself carries depth scale, as opposed to the record
+    /// merely being marked metric by an earlier cube/caliper calibration.
+    private func meshHasDepthScale(_ record: ScanRecord) -> Bool {
+        if let calibration = record.scaleCalibration {
+            return calibration.depthDimensionsMillimetres != nil
+        }
+        return record.isMetricallyScaled
+    }
+
+    @ViewBuilder
+    private func calibrationSection(for record: ScanRecord) -> some View {
+        Section {
+            if let calibration = record.scaleCalibration {
+                LabeledContent("Kalibrasyon yöntemi", value: calibration.method.displayName)
+                if let depth = calibration.depthDimensionsMillimetres, depth.count == 3 {
+                    LabeledContent("Derinlik boyutu", value: Self.formatDimensions(depth))
+                }
+                if let visual = calibration.visualDimensionsMillimetres, visual.count == 3 {
+                    LabeledContent("Görsel boyut", value: Self.formatDimensions(visual))
+                }
+                if let discrepancy = calibration.discrepancyPercent {
+                    LabeledContent(
+                        "Ölçek uyuşmazlığı",
+                        value: String(format: "%.1f%%", discrepancy)
+                    )
+                }
+                if let fitted = calibration.cubeHeightUnits,
+                   let real = calibration.cubeRealHeightMillimetres {
+                    LabeledContent(
+                        "Küp yüksekliği",
+                        value: String(format: "%.2f → %@ mm", fitted, Self.trimmedNumber(real))
+                    )
+                }
+                if let caliper = calibration.caliperMeasuredMillimetres {
+                    LabeledContent("Kumpas değeri", value: "\(Self.trimmedNumber(caliper)) mm")
+                }
+            } else if record.isMetricallyScaled {
+                Text("Ölçek derinlikten geliyor; kalibrasyon küpü bulunamadı.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("Bu tarama ölçeksiz. Kalibrasyon küpüyle tarayın veya kumpasla kalibre edin.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack {
+                Text("Küp gerçek yüksekliği (mm)")
+                Spacer()
+                TextField("10", text: $cubeHeightText)
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 72)
+            }
+            Button {
+                reanalyze(record)
+            } label: {
+                HStack {
+                    Text("Yeniden hesapla")
+                    if isAnalyzing {
+                        Spacer()
+                        ProgressView()
+                    }
+                }
+            }
+            .disabled(isAnalyzing)
+
+            HStack {
+                Text("En uzun kenar (mm)")
+                Spacer()
+                TextField("58", text: $caliperText)
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 72)
+            }
+            Button("Kumpasla kalibre et") { applyCaliper(record) }
+                .disabled(isAnalyzing || parsedNumber(caliperText) == nil)
+        } header: {
+            Text("Ölçek kalibrasyonu")
+        } footer: {
+            Text("Küpü objenin yanına koyup birlikte tarayın; uygulama küpü mesh içinde bulup ölçeği ondan alır.")
+        }
+    }
+
+    private func parsedNumber(_ text: String) -> Double? {
+        let normalized = text.replacingOccurrences(of: ",", with: ".")
+        guard let value = Double(normalized), value > 0 else { return nil }
+        return value
+    }
+
+    private func reanalyze(_ record: ScanRecord) {
+        guard let cubeHeight = parsedNumber(cubeHeightText) else { return }
+        UserDefaults.standard.set(cubeHeight, forKey: "calibration.cubeHeightMM")
+        isAnalyzing = true
+        let url = storage.modelURL(for: record)
+        let hasDepth = meshHasDepthScale(record)
+        Task {
+            let outcome = await Task.detached(priority: .userInitiated) {
+                TurntableScaleAnalyzer.analyze(
+                    modelAt: url,
+                    isMetricallyScaled: hasDepth,
+                    cubeRealHeightMillimetres: cubeHeight
+                )
+            }.value
+            isAnalyzing = false
+            guard let outcome else {
+                errorMessage = String(localized: "Model dosyası bulunamadı.")
+                return
+            }
+            var updated = record
+            if let calibration = outcome.calibration {
+                updated.scaleCalibration = calibration
+            }
+            if let dimensions = outcome.objectDimensionsMillimetres {
+                updated.dimensionsMillimetres = dimensions
+            }
+            updated.isMetricallyScaled = hasDepth
+                || updated.scaleCalibration != nil
+            storage.update(updated)
+        }
+    }
+
+    private func applyCaliper(_ record: ScanRecord) {
+        guard let measured = parsedNumber(caliperText) else { return }
+        isAnalyzing = true
+        let url = storage.modelURL(for: record)
+        let hasDepth = meshHasDepthScale(record)
+        let cubeHeight = parsedNumber(cubeHeightText) ?? 10.0
+        Task {
+            var units = record.scaleCalibration?.objectDimensionsUnits
+            var baseCalibration = record.scaleCalibration
+            if units == nil {
+                let outcome = await Task.detached(priority: .userInitiated) {
+                    TurntableScaleAnalyzer.analyze(
+                        modelAt: url,
+                        isMetricallyScaled: hasDepth,
+                        cubeRealHeightMillimetres: cubeHeight
+                    )
+                }.value
+                units = outcome?.objectDimensionsUnits
+                if baseCalibration == nil { baseCalibration = outcome?.calibration }
+            }
+            isAnalyzing = false
+            guard let units, units.count == 3, let longest = units.max(), longest > 0 else {
+                errorMessage = String(localized: "Model dosyası bulunamadı.")
+                return
+            }
+            let factor = measured / longest
+            var calibration = baseCalibration ?? ScaleCalibration(
+                method: .caliper,
+                millimetresPerUnit: factor,
+                objectDimensionsUnits: units,
+                depthDimensionsMillimetres: nil,
+                visualDimensionsMillimetres: nil,
+                cubeHeightUnits: nil,
+                cubeRealHeightMillimetres: nil,
+                discrepancyPercent: nil,
+                caliperMeasuredMillimetres: measured
+            )
+            calibration.method = .caliper
+            calibration.millimetresPerUnit = factor
+            calibration.objectDimensionsUnits = units
+            calibration.caliperMeasuredMillimetres = measured
+            var updated = record
+            updated.scaleCalibration = calibration
+            updated.dimensionsMillimetres = units.map { Int(($0 * factor).rounded()) }
+            updated.isMetricallyScaled = true
+            storage.update(updated)
+        }
     }
 
     // MARK: - Sections
@@ -348,8 +541,23 @@ struct ScanDetailView: View {
         } header: {
             Text("Dışa aktarma")
         } footer: {
-            Text("Hazırlanan dosya sağ üstteki paylaş düğmesinde görünür.")
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Hazırlanan dosya sağ üstteki paylaş düğmesinde görünür.")
+                if exportMillimetresPerUnit(for: record) != nil {
+                    Text("Dışa aktarma birimi: STL/OBJ/PLY milimetre, USDZ metre — ölçek gömülüdür.")
+                } else {
+                    Text("Kalibre edilmemiş dışa aktarma özgün birimdedir; boyutlar yanlış olabilir.")
+                        .foregroundStyle(.orange)
+                }
+            }
         }
+    }
+
+    /// The factor an export must bake in: the calibration's, or the plain
+    /// metres→millimetres conversion for a depth-scaled mesh.
+    private func exportMillimetresPerUnit(for record: ScanRecord) -> Double? {
+        record.scaleCalibration?.millimetresPerUnit
+            ?? (record.isMetricallyScaled ? 1000 : nil)
     }
 
     private func fullDetailSection(for record: ScanRecord) -> some View {
@@ -397,12 +605,17 @@ struct ScanDetailView: View {
     private func export(_ record: ScanRecord) {
         isExporting = true
         shareableURL = nil
+        let factor = exportMillimetresPerUnit(for: record)
+        let removeCube = record.engine == .turntable
+            && record.scaleCalibration?.cubeHeightUnits != nil
         Task {
             do {
                 shareableURL = try await MeshExporter.export(
                     modelAt: storage.modelURL(for: record),
                     as: exportFormat,
-                    namedLike: record.name
+                    namedLike: record.name,
+                    millimetresPerUnit: factor,
+                    removingCubeFaces: removeCube
                 )
             } catch {
                 errorMessage = error.localizedDescription

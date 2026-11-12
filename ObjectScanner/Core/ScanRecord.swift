@@ -15,8 +15,9 @@ struct ScanRecord: Identifiable, Codable, Hashable, Sendable {
     let modelFileName: String
 
     /// True when the geometry carries real-world dimensions. Photogrammetry gets
-    /// this from LiDAR; a pure-photo reconstruction would not.
-    let isMetricallyScaled: Bool
+    /// this from LiDAR; a pure-photo reconstruction would not — but a later
+    /// calibration (cube / caliper) can make it true after the fact.
+    var isMetricallyScaled: Bool
 
     /// How many stills fed the reconstruction (nil for depth-based engines).
     let imageCount: Int?
@@ -37,6 +38,12 @@ struct ScanRecord: Identifiable, Codable, Hashable, Sendable {
     /// sort. Optional, so records written before this existed still decode.
     var summary: String?
 
+    /// The scale audit trail for turntable scans: which reference (calibration
+    /// cube / caliper) anchored the scale, what the independent depth scale
+    /// says, and the factor exports must bake in. Optional, so records written
+    /// before this existed still decode.
+    var scaleCalibration: ScaleCalibration?
+
     /// True when the file is a mesh Quick Look can render. Point clouds are not,
     /// so the library has to fall back to a stats view instead of a preview.
     var isPreviewable: Bool {
@@ -54,7 +61,8 @@ struct ScanRecord: Identifiable, Codable, Hashable, Sendable {
         pointCount: Int? = nil,
         dimensionsMillimetres: [Int]? = nil,
         detail: ReconstructionDetail? = nil,
-        summary: String? = nil
+        summary: String? = nil,
+        scaleCalibration: ScaleCalibration? = nil
     ) {
         self.id = id
         self.name = name
@@ -67,6 +75,7 @@ struct ScanRecord: Identifiable, Codable, Hashable, Sendable {
         self.dimensionsMillimetres = dimensionsMillimetres
         self.detail = detail
         self.summary = summary
+        self.scaleCalibration = scaleCalibration
     }
 }
 
