@@ -158,13 +158,20 @@ final class PhotoCaptureCoordinator: NSObject, @unchecked Sendable {
     func drainPendingCaptures(timeout: TimeInterval) async {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
-            pendingLock.lock()
-            let pending = pendingCaptures.count
-            pendingLock.unlock()
-            if pending == 0 { return }
+            if pendingCaptureCount == 0 { return }
             try? await Task.sleep(for: .milliseconds(50))
         }
         Self.logger.error("Kalan çekimler zaman aşımında boşaltılamadı")
+    }
+
+    /// Pending-capture count, read synchronously on purpose: `NSLock`'s
+    /// lock/unlock are unavailable from asynchronous contexts under
+    /// Swift 6 concurrency checking (build runs 21–24 failed on exactly
+    /// that), so the async drain loop reads the count through here.
+    private var pendingCaptureCount: Int {
+        pendingLock.lock()
+        defer { pendingLock.unlock() }
+        return pendingCaptures.count
     }
 
     // MARK: - Locking
