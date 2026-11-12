@@ -5313,6 +5313,618 @@
           }
         }
       }
+    },
+    "%lld kare silinecek.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "frames will be deleted."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 帧将被删除。"
+          }
+        }
+      }
+    },
+    "Arka LiDAR • obje döner • derinlik füzyonu": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rear LiDAR • object rotates • depth fusion"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "后置 LiDAR • 物体旋转 • 深度融合"
+          }
+        }
+      }
+    },
+    "Başla": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开始"
+          }
+        }
+      }
+    },
+    "Bir tur tamamlandı — böyle devam edebilir veya yüksekliği değiştirebilirsiniz.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "One full turn is done — you can keep going or change the height."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一圈已完成——可以继续拍，也可以换高度。"
+          }
+        }
+      }
+    },
+    "Derinlik akışı henüz hazır değil — bir saniye bekleyin.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The depth stream is not ready yet — wait a second."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "深度数据流还没就绪——等一秒再试。"
+          }
+        }
+      }
+    },
+    "Desensiz, düz renkli objelerde en iyi sonucu verir; çok parlak ve şeffaf yüzeylerde derinlik ölçülemez.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Works best on textureless, plain-coloured objects; very glossy and transparent surfaces cannot be measured."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "对无纹理、纯色的物体效果最好；高反光和透明表面测不到深度。"
+          }
+        }
+      }
+    },
+    "Döner tabla ekseni bulunamadı — tabla yüzeyinin çerçeve dışında görünür olmasına dikkat edin.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The turntable axis was not found — make sure part of the turntable surface stays visible outside the frame."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没找到转台的旋转轴——请让一部分转台面露在框外。"
+          }
+        }
+      }
+    },
+    "Geçiş %lld · %lld/%lld kare · %lld nokta": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pass %lld · %lld/%lld frames · %lld points"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %lld 圈 · %lld/%lld 帧 · %lld 点"
+          }
+        }
+      }
+    },
+    "Geçişler arasında objeye dokunmayın; yalnızca telefonu yeni yüksekliğe taşıyın. Her geçiş kendi eksenini yeniden bulur.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Between passes, do not touch the object; only move the phone to a new height. Each pass finds its own axis again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "换圈之间不要碰物体，只把手机移到新高度。每一圈都会重新标定自己的转轴。"
+          }
+        }
+      }
+    },
+    "Girdi eklenemedi.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The input could not be added."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法添加输入。"
+          }
+        }
+      }
+    },
+    "Kalibre Et ve Başla": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calibrate and Start"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "标定并开始"
+          }
+        }
+      }
+    },
+    "Kare hizalanamadı — daha yavaş çevirin, her adım yaklaşık 10° olsun.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The frame could not be aligned — rotate more slowly, about 10° per step."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这一帧没对齐——转慢一点，每次约转 10°。"
+          }
+        }
+      }
+    },
+    "Kare Çek": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Capture Frame"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拍一帧"
+          }
+        }
+      }
+    },
+    "LiDAR derinlik kamerası bulunamadı.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No LiDAR depth camera was found."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未找到 LiDAR 深度相机。"
+          }
+        }
+      }
+    },
+    "LiDAR · %lld geçiş · %lld kare": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "LiDAR · %lld passes · %lld frames"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "LiDAR · %lld 圈 · %lld 帧"
+          }
+        }
+      }
+    },
+    "Model hazır": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Model ready"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "模型已就绪"
+          }
+        }
+      }
+    },
+    "Model oluşturulamadı: obje çok büyük.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The model could not be built: the object is too large."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法生成模型：物体太大。"
+          }
+        }
+      }
+    },
+    "Model oluşturulamadı: yüzey çıkarılamadı. Daha fazla kareyle tekrar deneyin.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The model could not be built: no surface could be extracted. Try again with more frames."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法生成模型：没能提取出表面。用更多帧重试。"
+          }
+        }
+      }
+    },
+    "Model oluşturuluyor…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Building the model…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在生成模型…"
+          }
+        }
+      }
+    },
+    "Otomatik": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动"
+          }
+        }
+      }
+    },
+    "Saf LiDAR": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pure LiDAR"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "纯雷达"
+          }
+        }
+      }
+    },
+    "Telefonu sabitleyin, objeyi tabla üzerinde çevirin — model yalnızca LiDAR derinliğinden oluşur, fotoğraf kullanılmaz.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fix the phone and rotate the object on the turntable — the model is built from LiDAR depth alone, no photos are used."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "把手机固定好，在转台上转动物体——模型完全由 LiDAR 深度生成，不用照片。"
+          }
+        }
+      }
+    },
+    "Telefonu yeni yüksekliğe taşıyın; obje ve tablaya dokunmayın.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move the phone to the new height; do not touch the object or the turntable."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "把手机移到新高度；不要碰物体和转台。"
+          }
+        }
+      }
+    },
+    "Yeni Geçişi Kalibre Et": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calibrate the New Pass"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "标定新一圈"
+          }
+        }
+      }
+    },
+    "Yeni Yükseklik Hazır — Çerçeveyi Ayarla": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Height Ready — Adjust the Frame"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新高度已就位 — 调整框选"
+          }
+        }
+      }
+    },
+    "Yeni geçiş önceki modelle zayıf eşleşti — obje yerinden oynamış olabilir.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The new pass matched the previous model weakly — the object may have moved."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新一圈与之前的模型对齐较弱——物体可能被碰动了。"
+          }
+        }
+      }
+    },
+    "Yeterli kare yok — en az 8 kare ve bir tam tur gerekir.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not enough frames — at least 8 frames and one full turn are needed."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "帧数不足——至少需要 8 帧并转满一圈。"
+          }
+        }
+      }
+    },
+    "Yükseklik değişimi algılandı": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Height change detected"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已感知到高度变化"
+          }
+        }
+      }
+    },
+    "Yüksekliği Değiştir": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change Height"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "换高度"
+          }
+        }
+      }
+    },
+    "Yüksekliği Değiştirin": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change the Height"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请调整高度"
+          }
+        }
+      }
+    },
+    "Çerçeve içinde yeterli derinlik yok — objeye yaklaşın.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not enough depth inside the frame — move closer to the object."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "框内深度数据不足——离物体近一点。"
+          }
+        }
+      }
+    },
+    "Çerçeve objeyi sarsın ama tabla yüzeyinin bir kısmı çerçeve dışında görünsün — dönme ekseni o yüzeyden bulunur.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Let the frame hug the object but keep part of the turntable surface visible outside it — the rotation axis is found from that surface."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "让框贴着物体，但要留一部分转台面在框外——旋转轴就是从那块表面算出来的。"
+          }
+        }
+      }
+    },
+    "Çerçeveyi objenin üzerine yerleştirin; tabla kenarı çerçeve dışında kalsın.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Place the frame over the object; keep the edge of the turntable outside the frame."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "把框放在物体上；转台边缘要留在框外。"
+          }
+        }
+      }
+    },
+    "Önce çerçeveyi objenin üzerine yerleştirin.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "First place the frame over the object."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "先把框放在物体上。"
+          }
+        }
+      }
+    },
+    "Önceki geçiş eğimi": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Previous pass tilt"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上一圈俯仰"
+          }
+        }
+      }
+    },
+    "Şu anki eğim": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Current tilt"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前俯仰"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

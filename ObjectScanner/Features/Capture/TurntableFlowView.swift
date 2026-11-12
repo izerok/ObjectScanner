@@ -221,7 +221,7 @@ private struct TurntableSetupGuide: View {
 
 // MARK: - Preview layer
 
-private struct CameraPreviewView: UIViewRepresentable {
+struct CameraPreviewView: UIViewRepresentable {
     let session: AVCaptureSession
     let maskFrame: CGRect
     let onMaskChange: (CGRect) -> Void
@@ -553,7 +553,7 @@ private struct TurntableMessageView: View {
     }
 }
 
-private struct TurntablePrimaryButton: ButtonStyle {
+struct TurntablePrimaryButton: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.subheadline.weight(.semibold))
@@ -563,7 +563,7 @@ private struct TurntablePrimaryButton: ButtonStyle {
     }
 }
 
-private struct TurntableSecondaryButton: ButtonStyle {
+struct TurntableSecondaryButton: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.subheadline.weight(.medium))
@@ -575,7 +575,7 @@ private struct TurntableSecondaryButton: ButtonStyle {
 }
 
 /// Draggable, pinchable rectangle marking the object.
-private struct ObjectMaskRectangle: View {
+struct ObjectMaskRectangle: View {
     @Binding var frame: CGRect
 
     @State private var dragOffset = CGSize.zero

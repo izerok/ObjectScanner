@@ -9,6 +9,9 @@ enum ScanEngineKind: String, Codable, CaseIterable, Sendable, Identifiable {
     case objectCapture
     /// Photogrammetry with the device fixed and the object rotating.
     case turntable
+    /// Pure depth fusion with the device fixed and the object rotating:
+    /// no photos at all, geometry comes from LiDAR alone.
+    case lidarTurntable
     /// Structured-light IR depth from the front-facing sensor.
     case trueDepth
     /// RoomPlan: LiDAR room capture producing walls, openings and furniture.
@@ -20,6 +23,7 @@ enum ScanEngineKind: String, Codable, CaseIterable, Sendable, Identifiable {
         switch self {
         case .objectCapture: String(localized: "Fotogrametri")
         case .turntable: String(localized: "Döner Tabla")
+        case .lidarTurntable: String(localized: "Saf LiDAR")
         // A product name, identical in every language.
         case .trueDepth: "TrueDepth"
         case .roomPlan: String(localized: "Oda")
@@ -30,6 +34,7 @@ enum ScanEngineKind: String, Codable, CaseIterable, Sendable, Identifiable {
         switch self {
         case .objectCapture: String(localized: "Arka kamera • sen dönersin • rehberli akış")
         case .turntable: String(localized: "Arka kamera • obje döner • telefon sabit")
+        case .lidarTurntable: String(localized: "Arka LiDAR • obje döner • derinlik füzyonu")
         case .trueDepth: String(localized: "Ön sensör • desensiz yüzeylerde bile ölçüm")
         case .roomPlan: String(localized: "LiDAR • odayı dolaş • duvar, kapı, mobilya")
         }
@@ -39,6 +44,7 @@ enum ScanEngineKind: String, Codable, CaseIterable, Sendable, Identifiable {
         switch self {
         case .objectCapture: "camera.viewfinder"
         case .turntable: "arrow.trianglehead.clockwise.rotate.90"
+        case .lidarTurntable: "sensor.fill"
         case .trueDepth: "faceid"
         case .roomPlan: "house"
         }
@@ -48,7 +54,7 @@ enum ScanEngineKind: String, Codable, CaseIterable, Sendable, Identifiable {
     /// scattering checks through the UI.
     var isImplemented: Bool {
         switch self {
-        case .objectCapture, .turntable, .trueDepth, .roomPlan: true
+        case .objectCapture, .turntable, .lidarTurntable, .trueDepth, .roomPlan: true
         }
     }
 
@@ -57,7 +63,7 @@ enum ScanEngineKind: String, Codable, CaseIterable, Sendable, Identifiable {
     /// cloud, which needs different handling everywhere downstream.
     var producesMesh: Bool {
         switch self {
-        case .objectCapture, .turntable, .roomPlan: true
+        case .objectCapture, .turntable, .lidarTurntable, .roomPlan: true
         case .trueDepth: false
         }
     }
@@ -73,7 +79,7 @@ enum ScanEngineKind: String, Codable, CaseIterable, Sendable, Identifiable {
         // Solving poses from images alone, with no world tracking to lean on, is
         // the weakest link in the app: it fails on featureless objects and on
         // backgrounds that move with the subject.
-        case .turntable, .trueDepth: .beta
+        case .turntable, .lidarTurntable, .trueDepth: .beta
         }
     }
 
