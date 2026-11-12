@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 jobs:
   build-ipa:
@@ -38,6 +39,32 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             | tee "$RUNNER_TEMP/xcodebuild.log"
+
+      # The build log itself never leaves the runner, and the API cannot
+      # hand it out (log downloads redirect off api.github.com) — so on
+      # failure, post the error lines as an issue where they stay readable
+      # through the plain API.
+      - name: Report build failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          LOG="$RUNNER_TEMP/xcodebuild.log"
+          {
+            echo "Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo
+            echo '### error lines'
+            echo '```'
+            grep -E 'error:' "$LOG" | head -120 || true
+            echo '```'
+            echo
+            echo '### log tail'
+            echo '```'
+            tail -n 80 "$LOG" || true
+            echo '```'
+          } > failure-report.md
+          gh issue create --title "Build failure — run ${GITHUB_RUN_NUMBER}" --body-file failure-report.md || true
 
       - name: Package IPA
         run: |
