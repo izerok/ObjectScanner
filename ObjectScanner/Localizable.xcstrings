@@ -358,6 +358,23 @@
         }
       }
     },
+    "10×10×10 mm küpü objenin yanına (1–2 cm) koy; sarı çerçevenin içinde kalsın. Uygulama küpü modelde bulup ölçeği ondan alır — derinlik ölçeğiyle de karşılaştırır.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Place the 10×10×10 mm cube next to the object (1–2 cm) and keep it inside the yellow frame. The app finds the cube in the model and takes the scale from it — and cross-checks it against the depth scale."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "把 10×10×10mm 标定块贴着物体放（1–2cm），确保它在黄色框内。App 会在模型里找到它并据此定尺度，还会和深度尺度对账。"
+          }
+        }
+      }
+    },
     "15 cm": {
       "extractionState": "manual",
       "localizations": {
@@ -1047,6 +1064,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "这台设备无法把深度嵌入照片——模型没有真实尺寸，会是无比例的。"
+          }
+        }
+      }
+    },
+    "Bu cihazda fotoğraflara derinlik gömülemiyor — ölçek ancak kalibrasyon küpüyle veya sonradan kumpasla gelir.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This device cannot embed depth in photos — scale can only come from the calibration cube, or a caliper afterwards."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此设备无法给照片附加深度 — 尺度只能靠标定块，或事后用卡尺标定。"
           }
         }
       }
@@ -1884,6 +1918,23 @@
         }
       }
     },
+    "Gerçek boyut için kalibrasyon küpünü de çerçeveye al": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Include the calibration cube in the frame for true size"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "想要真实尺寸，把标定块也框进来"
+          }
+        }
+      }
+    },
     "Geçici çözüm: objeye silinebilir işaretler koyun — kurşun kalem noktaları, düşük yapışkanlı bant parçaları veya üzerine desenli bir örtü. Fotogrametriye eşleşecek özellik vermek yeterli.": {
       "extractionState": "manual",
       "localizations": {
@@ -2254,6 +2305,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "标定块（视觉）"
+          }
+        }
+      }
+    },
+    "Kalibrasyon küpü bulunamadı — küple tekrar tarayın veya Galeri'den kumpasla kalibre edin": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No calibration cube found — rescan with the cube, or calibrate with a caliper from the Library"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未找到标定块 — 带块重扫，或在图库里用卡尺标定"
           }
         }
       }
@@ -5378,6 +5446,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "尺度来自深度；未找到标定块。"
+          }
+        }
+      }
+    },
+    "Ölçek için: 10 mm küp çerçevenin içinde, objenin yanında mı?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "For scale: is the 10 mm cube inside the frame, next to the object?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尺度提醒：10mm 标定块在框内、贴着物体吗？"
           }
         }
       }

@@ -136,6 +136,13 @@ private struct TurntableSetupGuide: View {
                 )
 
                 requirement(
+                    String(localized: "Gerçek boyut için kalibrasyon küpünü de çerçeveye al"),
+                    detail: String(localized: "10×10×10 mm küpü objenin yanına (1–2 cm) koy; sarı çerçevenin içinde kalsın. Uygulama küpü modelde bulup ölçeği ondan alır — derinlik ölçeğiyle de karşılaştırır."),
+                    systemImage: "cube",
+                    isCritical: true
+                )
+
+                requirement(
                     String(localized: "Arka plan sade olursa yine iyi olur"),
                     detail: String(localized: "Çerçeve işi çözüyor ama kenarları objeye çok yakınsa yardımcı olur: mümkünse arka planı biraz geriye al, yan yana kâğıt yerine tek parça bir fon kullan."),
                     systemImage: "square.dashed"
@@ -175,7 +182,7 @@ private struct TurntableSetupGuide: View {
 
                 if !deliversDepth {
                     Label(
-                        "Bu cihazda fotoğraflara derinlik gömülemiyor — model gerçek boyutta olmayacak, ölçeksiz çıkacak.",
+                        "Bu cihazda fotoğraflara derinlik gömülemiyor — ölçek ancak kalibrasyon küpüyle veya sonradan kumpasla gelir.",
                         systemImage: "ruler"
                     )
                     .font(.footnote)
@@ -263,6 +270,18 @@ private struct TurntableOverlay: View {
         VStack(spacing: 0) {
             topBar
             Spacer(minLength: 0)
+            if engine.shotCount == 0 {
+                Label(
+                    "Ölçek için: 10 mm küp çerçevenin içinde, objenin yanında mı?",
+                    systemImage: "cube"
+                )
+                .font(.caption)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(.black.opacity(0.55), in: Capsule())
+                .foregroundStyle(.white.opacity(0.9))
+                .padding(.bottom, 8)
+            }
             if let reason = engine.lastRejectionReason, engine.rejectedShots > 0 {
                 Label(reason, systemImage: "camera.metering.none")
                     .font(.caption)
@@ -508,6 +527,12 @@ private struct TurntableResultView: View {
                     Text("Ölçeksiz — derinlik verisi yoktu")
                         .font(.caption)
                         .foregroundStyle(.orange)
+                    if record.scaleCalibration == nil {
+                        Text("Kalibrasyon küpü bulunamadı — küple tekrar tarayın veya Galeri'den kumpasla kalibre edin")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                            .multilineTextAlignment(.center)
+                    }
                 }
                 if let calibration = record.scaleCalibration,
                    calibration.method == .visualCube {
