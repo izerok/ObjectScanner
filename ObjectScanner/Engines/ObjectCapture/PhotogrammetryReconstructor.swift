@@ -46,6 +46,16 @@ struct PhotogrammetryReconstructor {
             throw ScanEngineError.reconstructionFailed(String(localized: "Bu cihaz cihaz-üstü fotogrametriyi desteklemiyor."))
         }
 
+        // The session kills the process when its scratch-space check fails
+        // instead of surfacing an error — three identical device crash logs
+        // end at "Checking for reconstruction storage space ... Required
+        // bytes=4.5 GB" (v0.6.3). Check first and fail with words.
+        if let capacity = try? workspace.imagesURL.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
+            .volumeAvailableCapacityForImportantUsage,
+           capacity < 5_000_000_000 {
+            throw ScanEngineError.reconstructionFailed(String(localized: "Yetersiz depolama alanı: yeniden yapılandırma yaklaşık 4,5 GB geçici alan gerektirir. Lütfen yer açıp tekrar deneyin."))
+        }
+
         let imageURLs = ((try? FileManager.default.contentsOfDirectory(
             at: workspace.imagesURL,
             includingPropertiesForKeys: nil

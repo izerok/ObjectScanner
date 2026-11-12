@@ -3039,6 +3039,23 @@
         }
       }
     },
+    "Yetersiz depolama alanı: yeniden yapılandırma yaklaşık 4,5 GB geçici alan gerektirir. Lütfen yer açıp tekrar deneyin.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not enough storage: reconstruction needs about 4.5 GB of temporary space. Free up space and try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "储存空间不足：重建约需 4.5 GB 临时空间，请腾出空间后重试。"
+          }
+        }
+      }
+    },
     "Mat": {
       "extractionState": "manual",
       "localizations": {

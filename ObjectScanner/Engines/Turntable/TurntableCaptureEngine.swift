@@ -171,10 +171,16 @@ final class TurntableCaptureEngine: ScanEngine {
 
         let output: PhotogrammetryReconstructor.Output
         do {
+            // Folder input, not the masked sample sequence (v0.6.3): device
+            // crash logs end at the session's storage-space check, which is
+            // where the sequence input is first consumed — materialising
+            // 48 MP samples there is the prime suspect, and the folder path
+            // is the one the orbit mode proves daily. The session's own
+            // object masking stays enabled and does the segmentation.
             output = try await reconstructor.reconstruct(
                 workspace: workspace,
                 detail: .reduced,
-                maskRect: objectMaskRect,
+                maskRect: nil,
                 onWarning: { [weak self] note in
                     self?.warnings.append(note)
                 }
