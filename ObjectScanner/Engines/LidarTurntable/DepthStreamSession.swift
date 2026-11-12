@@ -31,12 +31,21 @@ final class DepthStreamSession: NSObject, AVCaptureDepthDataOutputDelegate, @unc
 
     private let frameLock = NSLock()
     private var latestDepth: AVDepthData?
+    private var latestDepthTimestamp: CMTime = .invalid
 
     /// Newest depth frame, if the stream has delivered one yet.
     func snapshotDepth() -> AVDepthData? {
         frameLock.lock()
         defer { frameLock.unlock() }
         return latestDepth
+    }
+
+    /// Capture timestamp of the newest frame — `AVDepthData` itself does not
+    /// carry one in Swift; the delegate receives it alongside.
+    var latestTimestamp: CMTime {
+        frameLock.lock()
+        defer { frameLock.unlock() }
+        return latestDepthTimestamp
     }
 
     func configure() throws {
@@ -114,6 +123,7 @@ final class DepthStreamSession: NSObject, AVCaptureDepthDataOutputDelegate, @unc
     ) {
         frameLock.lock()
         latestDepth = depthData
+        latestDepthTimestamp = timestamp
         frameLock.unlock()
     }
 

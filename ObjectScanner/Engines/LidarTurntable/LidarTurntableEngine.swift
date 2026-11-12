@@ -311,9 +311,10 @@ final class LidarTurntableEngine: ScanEngine {
     /// A depth frame newer than the last one consumed — auto-capture must
     /// never fuse the same frame twice.
     private func freshDepth() -> AVDepthData? {
-        guard let depth = stream?.snapshotDepth() else { return nil }
-        let timestamp = depth.timestamp
-        if lastUsedTimestamp.isValid, timestamp == lastUsedTimestamp { return nil }
+        guard let stream, let depth = stream.snapshotDepth() else { return nil }
+        let timestamp = stream.latestTimestamp
+        guard timestamp.isValid else { return nil }
+        if lastUsedTimestamp.isValid, CMTimeCompare(timestamp, lastUsedTimestamp) == 0 { return nil }
         lastUsedTimestamp = timestamp
         return depth
     }

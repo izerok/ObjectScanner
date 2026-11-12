@@ -296,7 +296,8 @@ enum TurntableFusion {
             outer: for dx in -1...1 {
                 for dy in -1...1 {
                     for dz in -1...1 {
-                        if targetVoxels.contains(key + SIMD3<Int32>(Int32(dx), Int32(dy), Int32(dz))) {
+                        let neighbor = SIMD3<Int32>(key.x + Int32(dx), key.y + Int32(dy), key.z + Int32(dz))
+                        if targetVoxels.contains(neighbor) {
                             found = true
                             break outer
                         }
