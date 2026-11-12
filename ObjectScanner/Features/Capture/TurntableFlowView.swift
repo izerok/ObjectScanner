@@ -908,19 +908,19 @@ private struct DualMaskOverlay: View {
                     .background(color, in: Capsule())
                     .position(x: rect.minX + 22, y: rect.minY - 10)
             }
+            // Gestures stay attached and no-op while locked, rather than
+            // switching between a gesture and nil — the optional-gesture
+            // ternary is the prime suspect for the run-21 build failure,
+            // and guarded handlers read the same to the user.
             .gesture(
-                editable
-                    ? DragGesture()
-                        .onChanged { drag.wrappedValue = $0.translation }
-                        .onEnded { _ in commit() }
-                    : nil
+                DragGesture()
+                    .onChanged { if editable { drag.wrappedValue = $0.translation } }
+                    .onEnded { _ in if editable { commit() } }
             )
             .simultaneousGesture(
-                editable
-                    ? MagnifyGesture()
-                        .onChanged { scale.wrappedValue = $0.magnification }
-                        .onEnded { _ in commit() }
-                    : nil
+                MagnifyGesture()
+                    .onChanged { if editable { scale.wrappedValue = $0.magnification } }
+                    .onEnded { _ in if editable { commit() } }
             )
     }
 }
