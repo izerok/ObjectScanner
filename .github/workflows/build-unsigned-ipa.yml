@@ -1,0 +1,74 @@
+name: Build unsigned IPA
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-ipa:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select latest Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks
+
+      - name: Build unsigned app
+        run: |
+          set -euo pipefail
+          xcodebuild build \
+            -project ObjectScanner.xcodeproj \
+            -scheme ObjectScanner \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            | tee "$RUNNER_TEMP/xcodebuild.log"
+
+      - name: Package IPA
+        run: |
+          set -euo pipefail
+          APP=$(find "$RUNNER_TEMP/DerivedData/Build/Products/Release-iphoneos" -maxdepth 1 -name '*.app' | head -1)
+          echo "APP=$APP"
+          test -n "$APP"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Info.plist"
+          rm -rf Payload ObjectScanner-unsigned.ipa
+          mkdir Payload
+          cp -R "$APP" Payload/
+          zip -qry ObjectScanner-unsigned.ipa Payload
+          ls -lh ObjectScanner-unsigned.ipa
+          shasum -a 256 ObjectScanner-unsigned.ipa | tee ObjectScanner-unsigned.ipa.sha256
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ObjectScanner-unsigned-ipa
+          path: |
+            ObjectScanner-unsigned.ipa
+            ObjectScanner-unsigned.ipa.sha256
+          retention-days: 30
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="unsigned-ipa-${GITHUB_RUN_NUMBER}"
+          gh release create "$TAG" ObjectScanner-unsigned.ipa ObjectScanner-unsigned.ipa.sha256 \
+            --title "ObjectScanner unsigned IPA (build ${GITHUB_RUN_NUMBER})" \
+            --notes "Unsigned IPA built by GitHub Actions from ${GITHUB_SHA}. Re-sign before installing. Bundle ID: com.example.ObjectScanner (upstream placeholder)."
