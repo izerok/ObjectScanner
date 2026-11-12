@@ -10,6 +10,7 @@ struct LidarTurntableFlowView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var engine: LidarTurntableEngine?
+    @AppStorage("turntable.clockwise") private var turntableClockwise = false
     @State private var finishedRecord: ScanRecord?
     @State private var startupError: String?
     @State private var hasSeenGuide = false
@@ -257,6 +258,20 @@ private struct LidarOverlay: View {
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.85))
                     .multilineTextAlignment(.center)
+                if engine.passNumber == 1 {
+                    Text(String(localized: "Tabla dönüş yönü (yukarıdan bakınca)"))
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.85))
+                    Picker(String(localized: "Tabla dönüş yönü (yukarıdan bakınca)"), selection: $turntableClockwise) {
+                        Text(String(localized: "Saat yönünün tersi")).tag(false)
+                        Text(String(localized: "Saat yönü")).tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    Text(String(localized: "Başlamadan önce tablayı çalıştırın — kalibrasyon bir tam tur kaydeder."))
+                        .font(.caption)
+                        .foregroundStyle(.yellow)
+                        .multilineTextAlignment(.center)
+                }
                 Button {
                     engine.primaryAction()
                 } label: {
@@ -268,6 +283,47 @@ private struct LidarOverlay: View {
                 }
                 .buttonStyle(TurntablePrimaryButton())
                 .disabled(engine.isProcessingShot)
+            }
+            .panelBackground()
+
+        case .calibratingRev:
+            VStack(spacing: 10) {
+                Label(String(localized: "Kalibrasyon Turu"), systemImage: "arrow.triangle.2.circlepath")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                Text(String(localized: "Tabla üzerindeki işaret tekrar ön tarafa geldiğinde «Bir Tur Tamam»a dokunun. Telefona ve objeye dokunmayın."))
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.85))
+                    .multilineTextAlignment(.center)
+                ProgressView()
+                    .tint(.white)
+                Text(String(format: String(localized: "%.0f saniye"), engine.calibrationElapsed))
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.white.opacity(0.85))
+                Button {
+                    engine.completeCalibrationRev()
+                } label: {
+                    Text(String(localized: "Bir Tur Tamam"))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(TurntablePrimaryButton())
+                .disabled(engine.calibrationElapsed < 3)
+                if engine.calibrationElapsed >= 12 {
+                    Button {
+                        engine.skipCalibrationRev()
+                    } label: {
+                        Text(String(localized: "Kalibrasyonu Atla (yalnız saat modu)"))
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(TurntableSecondaryButton())
+                }
+                Button {
+                    engine.cancelCalibrationRev()
+                } label: {
+                    Text(String(localized: "Vazgeç"))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(TurntableSecondaryButton())
             }
             .panelBackground()
 

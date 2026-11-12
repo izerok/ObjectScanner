@@ -36,6 +36,9 @@ final class LidarTurntableEngine: ScanEngine {
         /// Aiming and framing the mask; the next primary action calibrates
         /// the axis and takes the pass's first frame.
         case framing
+        /// The calibration revolution is being recorded (axis fitted,
+        /// widths sampled for one full turn).
+        case calibratingRev
         case capturing
         /// A pass is complete; the phone is being moved to a new height.
         /// Live pitch is shown so the move is *perceived*, not just asserted.
@@ -96,7 +99,7 @@ final class LidarTurntableEngine: ScanEngine {
 
     var session: AVCaptureSession? { stream?.session }
 
-    var canFinish: Bool { totalShots >= 30 && fusedPointCount > 500 }
+    var canFinish: Bool { totalShots >= 25 && fusedPointCount > 500 }
 
     // MARK: - Private
 
@@ -105,6 +108,9 @@ final class LidarTurntableEngine: ScanEngine {
     private var stream: DepthStreamSession?
     private let core = LidarFusionCore()
     private let motion = CMMotionManager()
+    private(set) var calibrationElapsed: Float = 0
+    private var revTask: Task<Void, Never>?
+    private var revStartedAt: CFTimeInterval = 0
     private var autoCaptureTask: Task<Void, Never>?
     private var streamMonitorTask: Task<Void, Never>?
     private var lastUsedTimestamp: CMTime = .invalid
@@ -112,6 +118,7 @@ final class LidarTurntableEngine: ScanEngine {
 
     init(storage: ScanStorage) {
         self.storage = storage
+        core.clock = { Float(CACurrentMediaTime()) }
     }
 
     // MARK: - ScanEngine
@@ -152,10 +159,19 @@ final class LidarTurntableEngine: ScanEngine {
             throw ScanEngineError.sessionUnavailable(String(localized: "Aktif oturum yok."))
         }
         guard canFinish else {
-            throw ScanEngineError.reconstructionFailed(String(localized: "Yeterli kare yok — en az 30 kare gerekir."))
+            throw ScanEngineError.reconstructionFailed(String(localized: "Yeterli kare yok — en az 25 kare gerekir."))
         }
 
         isAutoCapturing = false
+        if let depth = freshDepth() {
+            let mask = objectMaskRect ?? CGRect(x: 0.15, y: 0.2, width: 0.7, height: 0.6)
+            let box = DepthFrameBox(depth)
+            let core = self.core
+            _ = await Task.detached(priority: .userInitiated) {
+                let points = TurntableFusion.points(from: box.depth, maskRect: mask, insideMask: true, stride: 1)
+                core.acceptFinalFrame(objectPoints: points)
+            }.value
+        }
         phase = .reconstructing(ReconstructionProgress(fraction: 0.3, stage: .pointCloudGeneration))
         stream?.stop()
         motion.stopDeviceMotionUpdates()
@@ -237,7 +253,7 @@ final class LidarTurntableEngine: ScanEngine {
         switch passState {
         case .framing: calibrateAndBeginPass()
         case .capturing: setTrackingPaused(!trackingPaused)
-        case .awaitingElevation: break
+        case .calibratingRev, .awaitingElevation: break
         }
     }
 
@@ -263,6 +279,116 @@ final class LidarTurntableEngine: ScanEngine {
         // first report has not landed yet — fall back to a centred frame
         // rather than stranding the tap (v0.3.1).
         let mask = objectMaskRect ?? CGRect(x: 0.15, y: 0.2, width: 0.7, height: 0.6)
+        let isFirstPass = passNumber == 1 && totalShots == 0
+        guard isFirstPass else {
+            beginPassWithCurrentFrame()
+            return
+        }
+        // First pass of a session (v0.8): fit the axis, then record one
+        // full calibration revolution (width template + true period)
+        // before fusing anything. The turntable must already be spinning.
+        isProcessingShot = true
+        statusMessage = nil
+        let core = self.core
+        let box = DepthFrameBox(depth)
+        Task { @MainActor in
+            let result = await Task.detached(priority: .userInitiated) { () -> LidarFusionCore.CalibrationResult in
+                let objectPoints = TurntableFusion.points(from: box.depth, maskRect: mask, insideMask: true, stride: 1)
+                let backgroundPoints = TurntableFusion.points(from: box.depth, maskRect: mask, insideMask: false, stride: 3)
+                return core.calibrateAxisOnly(objectPoints: objectPoints, backgroundPoints: backgroundPoints)
+            }.value
+            isProcessingShot = false
+            switch result {
+            case .failed(let message):
+                statusMessage = message
+            case .begun:
+                core.beginCalibrationRev()
+                passState = .calibratingRev
+                calibrationElapsed = 0
+                revStartedAt = CACurrentMediaTime()
+                statusMessage = String(localized: "Kalibrasyon turu kaydediliyor — tablayı bir tam tur döndürün.")
+                startCalibrationRevLoop()
+            }
+        }
+    }
+
+    private func startCalibrationRevLoop() {
+        revTask?.cancel()
+        revTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                guard let self, self.passState == .calibratingRev else { return }
+                self.calibrationElapsed = Float(CACurrentMediaTime() - self.revStartedAt)
+                self.calibrationTick()
+                try? await Task.sleep(for: .milliseconds(250))
+            }
+        }
+    }
+
+    private var revTickInFlight = false
+
+    private func calibrationTick() {
+        guard passState == .calibratingRev, !revTickInFlight else { return }
+        guard let depth = freshDepth() else { return }
+        let mask = objectMaskRect ?? CGRect(x: 0.15, y: 0.2, width: 0.7, height: 0.6)
+        revTickInFlight = true
+        let core = self.core
+        let box = DepthFrameBox(depth)
+        Task { @MainActor in
+            _ = await Task.detached(priority: .userInitiated) { () -> Float? in
+                let points = TurntableFusion.points(from: box.depth, maskRect: mask, insideMask: true, stride: 1)
+                return core.tickCalibration(points: points)
+            }.value
+            revTickInFlight = false
+        }
+    }
+
+    /// The user calls the revolution complete (the platter's mark is back
+    /// at the front): freeze the period + template and start the pass.
+    func completeCalibrationRev() {
+        guard passState == .calibratingRev else { return }
+        let cost = core.finishCalibrationRev()
+        guard cost != nil else {
+            statusMessage = String(localized: "Tur çok kısa — biraz daha döndürün.")
+            return
+        }
+        let clockwise = UserDefaults.standard.bool(forKey: "turntable.clockwise")
+        core.setDirection(clockwiseFromAbove: clockwise)
+        UserDefaults.standard.set(Double(core.calibrationPeriod), forKey: "turntable.secondsPerRev")
+        revTask?.cancel()
+        if let cost, cost > 0.006 {
+            statusMessage = String(localized: "Silüet başlangıçla tam eşleşmedi — işaret bir tur erken/geç çağrılmış olabilir.")
+        } else {
+            statusMessage = nil
+        }
+        beginPassWithCurrentFrame()
+    }
+
+    /// Aborts the calibration revolution and returns to framing.
+    func cancelCalibrationRev() {
+        guard passState == .calibratingRev else { return }
+        revTask?.cancel()
+        passState = .framing
+        statusMessage = nil
+    }
+
+    /// Skips the calibration revolution: clock-only tracking from the
+    /// stored/entered revolution period (no width phase lock).
+    func skipCalibrationRev() {
+        guard passState == .calibratingRev else { return }
+        revTask?.cancel()
+        let stored = UserDefaults.standard.double(forKey: "turntable.secondsPerRev")
+        let period = stored > 2 ? stored : 12
+        let clockwise = UserDefaults.standard.bool(forKey: "turntable.clockwise")
+        core.omega = (clockwise ? -1 : 1) * 2 * .pi / Float(period)
+        beginPassWithCurrentFrame()
+    }
+
+    private func beginPassWithCurrentFrame() {
+        guard let depth = freshDepth() else {
+            statusMessage = String(localized: "Derinlik akışı henüz hazır değil — bir saniye bekleyin.")
+            return
+        }
+        let mask = objectMaskRect ?? CGRect(x: 0.15, y: 0.2, width: 0.7, height: 0.6)
         isProcessingShot = true
         statusMessage = nil
         let pitch = currentPitchDegrees
@@ -271,7 +397,7 @@ final class LidarTurntableEngine: ScanEngine {
         let box = DepthFrameBox(depth)
         Task { @MainActor in
             let result = await Task.detached(priority: .userInitiated) { () -> LidarFusionCore.CalibrationResult in
-                let objectPoints = TurntableFusion.points(from: box.depth, maskRect: mask, insideMask: true, stride: 2)
+                let objectPoints = TurntableFusion.points(from: box.depth, maskRect: mask, insideMask: true, stride: 1)
                 let backgroundPoints = TurntableFusion.points(from: box.depth, maskRect: mask, insideMask: false, stride: 3)
                 return core.beginPass(objectPoints: objectPoints, backgroundPoints: backgroundPoints, isFirstPass: isFirstPass)
             }.value
@@ -322,7 +448,7 @@ final class LidarTurntableEngine: ScanEngine {
         reseedOnResume = false
         Task { @MainActor in
             let outcome = await Task.detached(priority: .userInitiated) { () -> TickOutcome in
-                let points = TurntableFusion.points(from: box.depth, maskRect: mask, insideMask: true, stride: 2)
+                let points = TurntableFusion.points(from: box.depth, maskRect: mask, insideMask: true, stride: 1)
                 if reseed {
                     core.reseedReference(objectPoints: points)
                     return .reseeded
@@ -359,9 +485,19 @@ final class LidarTurntableEngine: ScanEngine {
                     trackingPaused = true
                     statusMessage = String(localized: "Bu tur tamamlandı — bitirebilir veya yükseklik değiştirebilirsiniz.")
                 } else if quality == .degraded {
-                    statusMessage = String(localized: "Takip zayıf — daha yavaş çevirin.")
+                    statusMessage = String(localized: "Silüet kilidi zayıf — faz kayması olabilir, turu bitirip kontrol edin.")
                 } else {
                     statusMessage = nil
+                }
+            case .tracked(.measured(let deltaDegrees, let inliers, let meanMM, let quality)):
+                lastDeltaDegrees = abs(deltaDegrees)
+                lastInliers = inliers
+                lastMeanMillimetres = meanMM
+                trackingQuality = quality
+                if abs(deltaDegrees) >= 355, isAutoCapturing {
+                    isAutoCapturing = false
+                    trackingPaused = true
+                    statusMessage = String(localized: "Bu tur tamamlandı — bitirebilir veya yükseklik değiştirebilirsiniz.")
                 }
             case .tracked(.rejected(let quality, let inliers, let meanMM)):
                 rejectedShots += 1
@@ -455,7 +591,7 @@ final class LidarTurntableEngine: ScanEngine {
             while !Task.isCancelled {
                 guard let self, self.isAutoCapturing, self.passState == .capturing else { return }
                 self.trackTick()
-                try? await Task.sleep(for: .milliseconds(200))
+                try? await Task.sleep(for: .milliseconds(300))
             }
         }
     }
@@ -497,7 +633,11 @@ final class LidarFusionCore: @unchecked Sendable {
     }
 
     enum TrackResult: Sendable {
+        /// Solved and fused; the frame became the new anchor.
         case accepted(deltaDegrees: Float, inliers: Float, meanMillimetres: Float, passRotationDegrees: Float, quality: TrackingQuality)
+        /// Solved against the current anchor but not yet far enough to
+        /// fuse (baseline < 9°): tracking is alive, nothing was integrated.
+        case measured(deltaDegrees: Float, inliers: Float, meanMillimetres: Float, quality: TrackingQuality)
         case rejected(quality: TrackingQuality, inliers: Float, meanMillimetres: Float)
     }
 
@@ -511,13 +651,68 @@ final class LidarFusionCore: @unchecked Sendable {
     private var cumulativeAngle: Float = 0
     private var lockedSign: Float?
 
-    // Continuous tracking state (v0.4): the reference is the previous
-    // sampled frame as a distance field, replaced on every accepted frame.
-    private var referenceField: VoxelDistanceField?
+    // Continuous tracking state (v0.8): constant-speed clock + silhouette
+    // phase lock. Offline simulation killed every per-frame depth
+    // registration design (nearest-neighbour, TSDF field, projective,
+    // patch flow): the visible skin of a convex object is nearly
+    // invariant under small rotations, so their minima sit near zero
+    // rotation — the petal/starburst failures on device. A motorised
+    // turntable needs no per-frame registration at all: the angle is
+    // omega x time, with omega timed over one full
+    // revolution (silhouette closure). The one depth observable that DOES track phase is the
+    // silhouette width (55->78mm over 45 degrees for a test box, phase
+    // readout within a few degrees in simulation): a width template
+    // recorded during the calibration revolution phase-locks the clock
+    // during the pass, absorbing motor drift.
+    /// Rotation rate (rad/s, signed). Set by the engine from the stored
+    /// turntable profile before each pass.
+    var omega: Float = 0
+    /// Monotonic seconds source (engine: CACurrentMediaTime; tests: a
+    /// virtual clock).
+    var clock: () -> Float = { 0 }
+    private var passStartTime: Float = 0
+    private var phaseCorrection: Float = 0
+    /// Template phase of the object at this pass's start (0 for the pass
+    /// that follows calibration; solved/persisted for later passes).
+    private var templatePhaseAtPassStart: Float = 0
+    private var alignmentDone = false
+    private var lastPhase: Float = 0
+    private var lastFusedPhase: Float = 0
+    private var lastLockCost: Float?
+    // Calibration-revolution recording.
+    private var calibrating = false
+    private var calibrationStart: Float = 0
+    private var calibrationWidths: [(elapsed: Float, widths: SIMD3<Float>)] = []
+    private(set) var calibrationPeriod: Float = 0
+    private var widthHistory: [(elapsed: Float, widths: SIMD3<Float>)] = []
+    private var phaseSign: Float = 1
+    private var phaseBase: Float = 0
+    private var signChecked = false
+    /// Silhouette width template over one revolution: (phase rad, widths
+    /// in three height bands, metres). Recorded at calibration.
+    private var widthTemplate: [(phase: Float, widths: SIMD3<Float>)] = []
     private var consecutiveLost = 0
     private var passRotation: Float = 0
+    /// Set when the axis was fitted ahead of the calibration revolution;
+    /// beginPass then reuses it instead of fitting again.
+    private var axisPreCalibrated = false
 
     var fusedPointCountSnapshot: Int { fusedCloud.pointCount }
+
+    /// Fits the turntable axis ahead of the calibration revolution (the
+    /// revolution's width bands need the axis). beginPass reuses it.
+    func calibrateAxisOnly(objectPoints: [SIMD3<Float>], backgroundPoints: [SIMD3<Float>]) -> CalibrationResult {
+        guard objectPoints.count >= 150 else {
+            return .failed(message: String(localized: "Çerçeve içinde yeterli derinlik yok — objeye yaklaşın."))
+        }
+        guard let axis = TurntableFusion.calibrateAxis(objectPoints: objectPoints, backgroundPoints: backgroundPoints) else {
+            return .failed(message: String(localized: "Döner tabla ekseni bulunamadı — tabla yüzeyinin çerçeve dışında görünür olmasına dikkat edin."))
+        }
+        passAxis = axis
+        passTransform = TurntableFusion.turntableTransform(axis: axis)
+        axisPreCalibrated = true
+        return .begun(yawWarning: nil)
+    }
 
     func beginPass(objectPoints: [SIMD3<Float>], backgroundPoints: [SIMD3<Float>], isFirstPass: Bool) -> CalibrationResult {
         guard objectPoints.count >= 150 else {
@@ -533,8 +728,6 @@ final class LidarFusionCore: @unchecked Sendable {
         cumulativeAngle = 0
         lockedSign = nil
         previousRawPoints = objectPoints
-        referenceField = VoxelDistanceField(
-            points: TurntableFusion.subsample(objectPoints, limit: 2000), voxelSize: 0.005)
         consecutiveLost = 0
         passRotation = 0
 
@@ -544,13 +737,15 @@ final class LidarFusionCore: @unchecked Sendable {
 
         if isFirstPass || volume == nil {
             // Establish the volume from this frame's extent about the axis.
-            var maxRadial: Float = 0.05
-            var maxY: Float = 0.05
-            for point in localPoints {
-                maxRadial = max(maxRadial, simd_length(SIMD2<Float>(point.x, point.z)))
-                maxY = max(maxY, point.y)
+            // Robust (percentile) bounds: a few noise-lifted platter
+            // points metres out must not blow up the volume.
+            let radials = localPoints.map { simd_length(SIMD2<Float>($0.x, $0.z)) }.sorted()
+            let heights = localPoints.map { $0.y }.sorted()
+            func percentile(_ values: [Float], _ q: Float) -> Float {
+                values[min(values.count - 1, max(0, Int(Float(values.count) * q)))]
             }
-            let radius = maxRadial + 0.05
+            let radius = max(0.05, percentile(radials, 0.995)) + 0.03
+            let maxY = max(0.05, percentile(heights, 0.995))
             volume = TSDFVolume(
                 boundsMin: SIMD3<Float>(-radius, -0.015, -radius),
                 boundsMax: SIMD3<Float>(radius, maxY + 0.04, radius),
@@ -582,81 +777,355 @@ final class LidarFusionCore: @unchecked Sendable {
         let worldPoints = localPoints.map { yawRotation * $0 }
         volume?.integrate(points: worldPoints, cameraOrigin: passCameraOriginWorld)
         fusedCloud.insert(TurntableFusion.subsample(worldPoints, limit: 6000))
+        passStartTime = clock()
+        phaseCorrection = 0
+        widthHistory.removeAll()
+        lastFusedPhase = 0
+        lastPhase = 0
+        lastLockCost = nil
+        // Alignment bookkeeping: with no template everything runs on the
+        // bare clock. The pass after calibration knows its template phase
+        // (0) but must still verify the rate's sign against the width
+        // history; later passes keep the verified sign and re-solve the
+        // template phase (the object did not move, only the phone did).
+        phaseSign = omega < 0 ? -1 : 1
+        phaseBase = 0
+        if widthTemplate.isEmpty {
+            alignmentDone = true
+            signChecked = true
+        } else if isFirstPass {
+            alignmentDone = true
+            signChecked = false
+        } else {
+            alignmentDone = false
+            signChecked = true
+        }
         return .begun(yawWarning: yawWarning)
     }
 
-    /// One tracking sample of the continuous-rotation pipeline (v0.4). The
-    /// frame is registered against the *previous sampled frame* — a degree
-    /// or three away, inside a ±7° distance-scored search — and only
-    /// integrated when the fit is genuinely good. A rejected frame changes
-    /// nothing but the lost counter: bad geometry never enters the volume,
-    /// which is the exact failure that sank the discrete-shot design.
-    func trackFrame(objectPoints: [SIMD3<Float>]) -> TrackResult {
-        guard let axis = passAxis, let volume, let referenceField else {
-            return .rejected(quality: .lost, inliers: 0, meanMillimetres: 0)
-        }
-        guard objectPoints.count >= 150 else {
-            return .rejected(quality: .degraded, inliers: 0, meanMillimetres: 0)
-        }
-        let sample = TurntableFusion.subsample(objectPoints, limit: 2000)
-        let estimate = MicroAngleRegistration.estimate(
-            reference: referenceField,
-            points: sample,
-            axisPoint: axis.point,
-            axisDirection: axis.direction
-        )
-        let delta = estimate.delta
-        // A winner at the search edge means the rotation outran the window.
-        let atBoundary = abs(delta) > 6.8 * .pi / 180
-        // Reversing direction mid-pass would corrupt the accumulation; small
-        // jitter around zero is fine.
-        let backwards = lockedSign.map { sign in
-            delta != 0 && (delta > 0) != (sign > 0) && abs(delta) > 0.3 * .pi / 180
-        } ?? false
-        guard estimate.inliers >= 0.40, estimate.meanDistance <= 0.013, !atBoundary, !backwards else {
-            consecutiveLost += 1
-            return .rejected(
-                quality: consecutiveLost >= 3 ? .lost : .degraded,
-                inliers: estimate.inliers,
-                meanMillimetres: estimate.meanDistance * 1000
-            )
-        }
+    // MARK: - Silhouette widths
 
-        if lockedSign == nil, abs(delta) >= 0.2 * .pi / 180 {
-            lockedSign = delta > 0 ? 1 : -1
+    /// Silhouette widths in three height bands (metres): band = height
+    /// above the turntable plane (8-16 / 16-26 / 26+ mm), width = the
+    /// 2%-98% camera-x extent. A band with too few points reads -1.
+    func silhouetteWidths(points: [SIMD3<Float>]) -> SIMD3<Float>? {
+        guard let axis = passAxis else { return nil }
+        var bands: [[Float]] = [[], [], []]
+        for point in points {
+            let h = simd_dot(point - axis.point, axis.direction)
+            if h >= 0.008 {
+                bands[h < 0.016 ? 0 : h < 0.026 ? 1 : 2].append(point.x)
+            }
         }
-        cumulativeAngle += delta
-        passRotation += abs(delta)
+        var widths = SIMD3<Float>(-1, -1, -1)
+        var valid = 0
+        for band in 0..<3 where bands[band].count >= 30 {
+            let sorted = bands[band].sorted()
+            widths[band] = sorted[Int(Float(sorted.count) * 0.98)]
+                - sorted[Int(Float(sorted.count) * 0.02)]
+            valid += 1
+        }
+        return valid >= 2 ? widths : nil
+    }
 
-        let unrotate = TurntableFusion.rotationMatrix(axis: axis.direction, angleRadians: -cumulativeAngle)
+    private func widthCost(_ a: SIMD3<Float>, _ b: SIMD3<Float>) -> Float {
+        var sum: Float = 0
+        var n = 0
+        for i in 0..<3 where a[i] >= 0 && b[i] >= 0 {
+            sum += abs(a[i] - b[i])
+            n += 1
+        }
+        return n > 0 ? sum / Float(n) : .greatestFiniteMagnitude
+    }
+
+    private func templateWidths(at phase: Float) -> SIMD3<Float>? {
+        guard widthTemplate.count >= 2 else { return nil }
+        let twoPi = 2 * Float.pi
+        var wrapped = phase.truncatingRemainder(dividingBy: twoPi)
+        if wrapped < 0 { wrapped += twoPi }
+        // Template phases are sorted ascending over [0, 2pi).
+        var upper = widthTemplate.firstIndex { $0.phase >= wrapped } ?? widthTemplate.count
+        if upper == 0 { upper = widthTemplate.count }
+        let hi = widthTemplate[upper % widthTemplate.count]
+        let lo = widthTemplate[upper - 1]
+        let hiPhase = upper == widthTemplate.count ? hi.phase + twoPi : hi.phase
+        let span = hiPhase - lo.phase
+        guard span > 0 else { return hi.widths }
+        let t = (wrapped - lo.phase) / span
+        var result = SIMD3<Float>(0, 0, 0)
+        for i in 0..<3 {
+            result[i] = (lo.widths[i] < 0 || hi.widths[i] < 0)
+                ? max(lo.widths[i], hi.widths[i])
+                : lo.widths[i] + (hi.widths[i] - lo.widths[i]) * t
+        }
+        return result
+    }
+
+    // MARK: - Calibration revolution
+
+    /// Starts recording the calibration revolution. The engine calls
+    /// this right after axis calibration, with the turntable already
+    /// spinning and the platter's reference mark at the front; the user
+    /// ends the revolution with a tap when the mark comes back around.
+    func beginCalibrationRev() {
+        calibrating = true
+        calibrationWidths.removeAll()
+        calibrationStart = clock()
+    }
+
+    var isCalibrating: Bool { calibrating }
+
+    /// Feeds one frame during the calibration revolution (width samples
+    /// for the template). Returns the current width-match cost against
+    /// the starting frame, for the UI's information.
+    @discardableResult
+    func tickCalibration(points: [SIMD3<Float>]) -> Float? {
+        guard calibrating, let widths = silhouetteWidths(points: points) else { return nil }
+        let elapsed = clock() - calibrationStart
+        calibrationWidths.append((elapsed, widths))
+        guard let first = calibrationWidths.first?.widths else { return nil }
+        return widthCost(widths, first)
+    }
+
+    /// Ends the calibration revolution on the user's tap (the platter's
+    /// mark is back at the front). Sets the period, the rate magnitude
+    /// and the width template. Returns the width-match cost at closure —
+    /// a large value suggests the tap was early or late. Silhouette
+    /// auto-closure is deliberately NOT used: for a symmetric object the
+    /// widths repeat every symmetry period, so only the user's eye can
+    /// call the full turn.
+    @discardableResult
+    func finishCalibrationRev() -> Float? {
+        guard calibrating, calibrationWidths.count >= 8,
+              let first = calibrationWidths.first, let last = calibrationWidths.last else { return nil }
+        let period = last.elapsed - first.elapsed
+        guard period >= 2 else { return nil }
+        calibrating = false
+        calibrationPeriod = period
+        widthTemplate = calibrationWidths.map {
+            (phase: $0.elapsed / period * 2 * .pi, widths: $0.widths)
+        }
+        omega = 2 * .pi / period
+        templatePhaseAtPassStart = 0
+        return widthCost(last.widths, first.widths)
+    }
+
+    /// Applies the user's direction choice to the calibrated rate.
+    func setDirection(clockwiseFromAbove: Bool) {
+        let magnitude = abs(omega)
+        guard magnitude > 0 else { return }
+        // Counterclockwise seen from above = positive rotation about the
+        // up axis (right-hand rule), which is the core's convention.
+        omega = clockwiseFromAbove ? -magnitude : magnitude
+    }
+
+    var hasWidthTemplate: Bool { !widthTemplate.isEmpty }
+
+    // MARK: - Tracking (clock + width phase lock)
+
+    /// Local phase (rotation since this pass's first frame, signed).
+    private func localPhase(elapsed: Float) -> Float {
+        phaseBase + phaseSign * abs(omega) * elapsed
+    }
+
+    /// Verifies the rate's sign once per session by matching the width
+    /// history against the template both ways; a clearly better reversed
+    /// match flips the sign (mirroring the phase around the pass start).
+    private func solveSignIfNeeded() {
+        guard !signChecked, !widthTemplate.isEmpty, widthHistory.count >= 6,
+              let first = widthHistory.first, let last = widthHistory.last,
+              abs(omega) * (last.elapsed - first.elapsed) >= 35 * .pi / 180 else { return }
+        func cost(sign: Float) -> Float {
+            var total: Float = 0
+            var n = 0
+            for entry in widthHistory {
+                if let tw = templateWidths(at: templatePhaseAtPassStart + sign * abs(omega) * entry.elapsed) {
+                    total += widthCost(tw, entry.widths)
+                    n += 1
+                }
+            }
+            return n > 0 ? total / Float(n) : .greatestFiniteMagnitude
+        }
+        let current = cost(sign: phaseSign)
+        let flipped = cost(sign: -phaseSign)
+        if flipped <= 0.005, flipped < 0.6 * current {
+            let rawElapsed = abs(omega) * (last.elapsed)
+            let oldLocal = phaseBase + phaseSign * rawElapsed
+            phaseSign = -phaseSign
+            phaseBase = -oldLocal - phaseSign * rawElapsed
+            omega = phaseSign * abs(omega)
+        }
+        signChecked = true
+    }
+
+    /// Solves the template phase at pass start for later passes by
+    /// matching the recorded width history against the template.
+    private func solveAlignmentIfNeeded() {
+        guard !alignmentDone, !widthTemplate.isEmpty, widthHistory.count >= 6,
+              let first = widthHistory.first, let last = widthHistory.last,
+              abs(omega) * (last.elapsed - first.elapsed) >= 35 * .pi / 180 else { return }
+        var best: (psi: Float, cost: Float) = (templatePhaseAtPassStart, .greatestFiniteMagnitude)
+        var psi: Float = 0
+        while psi < 2 * .pi {
+            var total: Float = 0
+            var n = 0
+            for entry in widthHistory {
+                if let tw = templateWidths(at: psi + phaseSign * abs(omega) * entry.elapsed) {
+                    total += widthCost(tw, entry.widths)
+                    n += 1
+                }
+            }
+            if n > 0 {
+                let cost = total / Float(n)
+                if cost < best.cost { best = (psi, cost) }
+            }
+            psi += 3 * .pi / 180
+        }
+        if best.cost <= 0.005 {
+            templatePhaseAtPassStart = best.psi
+        }
+        // Even a poor match (near-symmetric object) proceeds on the clock.
+        alignmentDone = true
+    }
+
+    /// Current best local phase: the clock, phase-locked to the width
+    /// template when one is available and alignment is settled.
+    private func currentPhase(elapsed: Float, widths: SIMD3<Float>?) -> Float {
+        let clockPhase = localPhase(elapsed: elapsed)
+        guard alignmentDone, let widths, !widthTemplate.isEmpty else {
+            lastLockCost = nil
+            lastPhase = clockPhase + phaseCorrection
+            return lastPhase
+        }
+        let base = templatePhaseAtPassStart + clockPhase + phaseCorrection
+        var bestPhase = base
+        var bestCost: Float = .greatestFiniteMagnitude
+        var step: Float = -25 * .pi / 180
+        while step <= 25 * .pi / 180 {
+            let candidate = base + step
+            if let tw = templateWidths(at: candidate) {
+                let cost = widthCost(tw, widths)
+                if cost < bestCost { bestCost = cost; bestPhase = candidate }
+            }
+            step += 1 * .pi / 180
+        }
+        lastLockCost = bestCost
+        if bestCost <= 0.006 {
+            let target = bestPhase - (templatePhaseAtPassStart + clockPhase)
+            let delta = target - phaseCorrection
+            let limit: Float = 3 * .pi / 180
+            phaseCorrection += max(-limit, min(limit, delta))
+        }
+        lastPhase = clockPhase + phaseCorrection
+        return lastPhase
+    }
+
+    private func fuse(points: [SIMD3<Float>], absoluteAngle: Float) {
+        guard let axis = passAxis, let volume else { return }
+        let points = points.filter { simd_dot($0 - axis.point, axis.direction) >= 0.004 }
+        guard points.count >= 100 else { return }
+        let unrotate = TurntableFusion.rotationMatrix(axis: axis.direction, angleRadians: -absoluteAngle)
         let yawRotation = TurntableFusion.rotationMatrix(axis: SIMD3<Float>(0, 1, 0), angleRadians: passYaw)
-        let worldPoints = objectPoints.map { point in
+        let worldPoints = points.map { point in
             let unrotated = axis.point + unrotate * (point - axis.point)
             return yawRotation * TurntableFusion.apply(passTransform, to: unrotated)
         }
         volume.integrate(points: worldPoints, cameraOrigin: passCameraOriginWorld)
         fusedCloud.insert(TurntableFusion.subsample(worldPoints, limit: 6000))
-        previousRawPoints = objectPoints
-        self.referenceField = VoxelDistanceField(points: sample, voxelSize: 0.005)
-        consecutiveLost = 0
+        previousRawPoints = points
+    }
 
-        return .accepted(
-            deltaDegrees: abs(delta * 180 / .pi),
-            inliers: estimate.inliers,
-            meanMillimetres: estimate.meanDistance * 1000,
-            passRotationDegrees: passRotation * 180 / .pi,
-            quality: estimate.inliers >= 0.65 ? .good : .degraded
+    /// One tracking tick of the constant-speed pipeline (v0.8). The angle
+    /// comes from the clock; the width template phase-locks it. Frames
+    /// fuse at ~10-degree phase steps once alignment is settled.
+    func trackFrame(objectPoints: [SIMD3<Float>]) -> TrackResult {
+        guard passAxis != nil, volume != nil, omega != 0 else {
+            return .rejected(quality: .lost, inliers: 0, meanMillimetres: 0)
+        }
+        guard objectPoints.count >= 150 else {
+            return .rejected(quality: .degraded, inliers: 0, meanMillimetres: 0)
+        }
+        let elapsed = clock() - passStartTime
+        let widths = silhouetteWidths(points: objectPoints)
+        if let widths {
+            widthHistory.append((elapsed: elapsed, widths: widths))
+            if widthHistory.count > 600 { widthHistory.removeFirst(200) }
+        }
+        solveSignIfNeeded()
+        solveAlignmentIfNeeded()
+        let phase = currentPhase(elapsed: elapsed, widths: widths)
+        // A steadily growing correction means the calibrated rate is off
+        // (tap error): fold the accumulated correction into the rate so
+        // the lock only has to track wobble, not a constant slope.
+        if abs(phaseCorrection) >= 6 * .pi / 180, elapsed > 1 {
+            let raw = phaseSign * abs(omega) * elapsed
+            if abs(raw) > 20 * .pi / 180 {
+                let scale = (raw + phaseCorrection) / raw
+                if scale > 0.9, scale < 1.1 {
+                    let newMagnitude = abs(omega) * scale
+                    phaseBase = phase - phaseSign * newMagnitude * elapsed
+                    omega = phaseSign * newMagnitude
+                    phaseCorrection = 0
+                }
+            }
+        }
+        let ready = alignmentDone && signChecked
+        let advance = (phase - lastFusedPhase) * phaseSign
+        let lockCost = lastLockCost ?? 0
+        let quality: TrackingQuality = !ready ? .degraded
+            : (lastLockCost.map { $0 <= 0.003 } ?? true) ? .good : .degraded
+
+        if ready, advance >= 10 * .pi / 180 {
+            fuse(points: objectPoints, absoluteAngle: phase)
+            lastFusedPhase = phase
+            passRotation += advance
+            consecutiveLost = 0
+            return .accepted(
+                deltaDegrees: advance * 180 / .pi,
+                inliers: max(0, 1 - lockCost / 0.006),
+                meanMillimetres: lockCost * 1000,
+                passRotationDegrees: passRotation * 180 / .pi,
+                quality: quality
+            )
+        }
+        if advance < -3 * .pi / 180 {
+            consecutiveLost += 1
+            return .rejected(
+                quality: consecutiveLost >= 3 ? .lost : .degraded,
+                inliers: 0, meanMillimetres: lockCost * 1000
+            )
+        }
+        return .measured(
+            deltaDegrees: phase * 180 / .pi,
+            inliers: max(0, 1 - lockCost / 0.006),
+            meanMillimetres: lockCost * 1000,
+            quality: quality
         )
     }
 
-    /// Re-anchors tracking after a pause: the next frame becomes the
-    /// reference without being integrated and without touching the
-    /// accumulated angle (the object is assumed not to have moved while
-    /// paused — the UI says so).
+    /// Finish-time tail capture: fuse the latest frame if it sits at
+    /// least 3 degrees past the last anchor, so the model doesn't lose
+    /// the final wedge of surface.
+    @discardableResult
+    func acceptFinalFrame(objectPoints: [SIMD3<Float>]) -> Bool {
+        guard alignmentDone, signChecked, objectPoints.count >= 150 else { return false }
+        let phase = currentPhase(elapsed: clock() - passStartTime, widths: silhouetteWidths(points: objectPoints))
+        guard (phase - lastFusedPhase) * phaseSign >= 3 * .pi / 180 else { return false }
+        fuse(points: objectPoints, absoluteAngle: phase)
+        passRotation += (phase - lastFusedPhase) * phaseSign
+        lastFusedPhase = phase
+        return true
+    }
+
+    /// Resume after a pause: shift the clock origin so the phase
+    /// continues from the last estimate (the platter was stopped too, or
+    /// the width lock will complain loudly via rejected frames).
     func reseedReference(objectPoints: [SIMD3<Float>]) {
-        guard objectPoints.count >= 150 else { return }
-        referenceField = VoxelDistanceField(
-            points: TurntableFusion.subsample(objectPoints, limit: 2000), voxelSize: 0.005)
+        _ = objectPoints
+        let rate = phaseSign * abs(omega)
+        if rate != 0 {
+            passStartTime = clock() - (lastPhase - phaseCorrection - phaseBase) / rate
+        }
         consecutiveLost = 0
     }
 

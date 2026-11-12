@@ -6218,6 +6218,178 @@
           }
         }
       }
+    },
+    "Yeterli kare yok — en az 25 kare gerekir.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not enough frames — at least 25 are required."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeterli kare yok — en az 25 kare gerekir."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "帧数不足——至少需要 25 帧。"
+          }
+        }
+      }
+    },
+    "Kalibrasyon turu kaydediliyor — tablayı bir tam tur döndürün.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在记录标定圈——请让转台转满一整圈。"
+          }
+        }
+      }
+    },
+    "Tur tamamlanamadı — obje siluete sahip değilse kalibrasyonu atlayabilirsiniz.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一圈未能完成——若物体轮廓不明显，可以跳过标定。"
+          }
+        }
+      }
+    },
+    "Silüet kilidi zayıf — faz kayması olabilir, turu bitirip kontrol edin.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "轮廓锁定较弱——可能存在相位漂移，请转完这一圈后检查模型。"
+          }
+        }
+      }
+    },
+    "Tabla dönüş yönü (yukarıdan bakınca)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "转台旋转方向（从上方看）"
+          }
+        }
+      }
+    },
+    "Saat yönünün tersi": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "逆时针"
+          }
+        }
+      }
+    },
+    "Saat yönü": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "顺时针"
+          }
+        }
+      }
+    },
+    "Başlamadan önce tablayı çalıştırın — kalibrasyon bir tam tur kaydeder.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开始前先启动转台——标定将记录完整一圈。"
+          }
+        }
+      }
+    },
+    "Kalibrasyon Turu": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "标定圈"
+          }
+        }
+      }
+    },
+    "Tabla bir tam tur dönerken silüet kaydediliyor. Telefona ve objeye dokunmayın.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "转台转满一圈期间正在记录轮廓，请勿触碰手机和物体。"
+          }
+        }
+      }
+    },
+    "%.0f saniye": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%.0f 秒"
+          }
+        }
+      }
+    },
+    "Kalibrasyonu Atla (yalnız saat modu)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跳过标定（仅时钟模式）"
+          }
+        }
+      }
+    },
+    "Tur çok kısa — biraz daha döndürün.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这一圈太短了——再让它转一会儿。"
+          }
+        }
+      }
+    },
+    "Silüet başlangıçla tam eşleşmedi — işaret bir tur erken/geç çağrılmış olabilir.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "轮廓与起点未完全吻合——标记可能早按或晚按了一圈。"
+          }
+        }
+      }
+    },
+    "Tabla üzerindeki işaret tekrar ön tarafa geldiğinde «Bir Tur Tamam»a dokunun. Telefona ve objeye dokunmayın.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当转台上的标记再次转到正面时，点「一圈完成」。请勿触碰手机和物体。"
+          }
+        }
+      }
+    },
+    "Bir Tur Tamam": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一圈完成"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

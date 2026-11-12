@@ -27,6 +27,50 @@ enum TurntableFusion {
     ///   - insideMask: keep only points whose normalised image position falls
     ///     in `maskRect` (the object), or only points outside it (the
     ///     turntable/background, used for axis calibration).
+    /// One unprojected depth sample, with the pixel it came from. The pixel
+    /// matters: projective (per-ray) scoring is what gives the turntable
+    /// registration its gradient — nearest-neighbour distances are nearly
+    /// angle-blind on planar faces (offline simulation, v0.5).
+    struct DepthSample: Sendable {
+        var point: SIMD3<Float>
+        var column: Int
+        var row: Int
+    }
+
+    struct CameraModel: Sendable {
+        var focalX: Float
+        var focalY: Float
+        var centerX: Float
+        var centerY: Float
+        var width: Int
+        var height: Int
+    }
+
+    /// The buffer-space camera model for a depth frame, with intrinsics
+    /// scaled from the calibration's reference dimensions exactly as the
+    /// unprojection scales them.
+    static func cameraModel(from depthData: AVDepthData) -> CameraModel? {
+        let converted = depthData.depthDataType == kCVPixelFormatType_DepthFloat32
+            ? depthData
+            : depthData.converting(toDepthDataType: kCVPixelFormatType_DepthFloat32)
+        guard let calibration = converted.cameraCalibrationData else { return nil }
+        let buffer = converted.depthDataMap
+        let width = CVPixelBufferGetWidth(buffer)
+        let height = CVPixelBufferGetHeight(buffer)
+        let reference = calibration.intrinsicMatrixReferenceDimensions
+        let scaleX = Float(width) / Float(reference.width)
+        let scaleY = Float(height) / Float(reference.height)
+        let intrinsics = calibration.intrinsicMatrix
+        return CameraModel(
+            focalX: intrinsics.columns.0.x * scaleX,
+            focalY: intrinsics.columns.1.y * scaleY,
+            centerX: intrinsics.columns.2.x * scaleX,
+            centerY: intrinsics.columns.2.y * scaleY,
+            width: width,
+            height: height
+        )
+    }
+
     static func points(
         from depthData: AVDepthData,
         maskRect: CGRect?,
@@ -36,6 +80,20 @@ enum TurntableFusion {
         maximumDepth: Float = 1.20,
         maximumNeighbourDelta: Float = 0.03
     ) -> [SIMD3<Float>] {
+        samples(from: depthData, maskRect: maskRect, insideMask: insideMask, stride: stride,
+                minimumDepth: minimumDepth, maximumDepth: maximumDepth,
+                maximumNeighbourDelta: maximumNeighbourDelta).map(\.point)
+    }
+
+    static func samples(
+        from depthData: AVDepthData,
+        maskRect: CGRect?,
+        insideMask: Bool,
+        stride: Int = 2,
+        minimumDepth: Float = 0.15,
+        maximumDepth: Float = 1.20,
+        maximumNeighbourDelta: Float = 0.03
+    ) -> [DepthSample] {
         let converted = depthData.depthDataType == kCVPixelFormatType_DepthFloat32
             ? depthData
             : depthData.converting(toDepthDataType: kCVPixelFormatType_DepthFloat32)
@@ -61,7 +119,7 @@ enum TurntableFusion {
         let centerY = intrinsics.columns.2.y * scaleY
         guard focalX > 0, focalY > 0 else { return [] }
 
-        var points: [SIMD3<Float>] = []
+        var points: [DepthSample] = []
         points.reserveCapacity(8192)
 
         let step = max(1, stride)
@@ -91,10 +149,14 @@ enum TurntableFusion {
                 if right.isFinite, abs(right - depth) > maximumNeighbourDelta { continue }
                 if below.isFinite, abs(below - depth) > maximumNeighbourDelta { continue }
 
-                points.append(SIMD3<Float>(
-                    (Float(column) - centerX) * depth / focalX,
-                    (Float(row) - centerY) * depth / focalY,
-                    depth
+                points.append(DepthSample(
+                    point: SIMD3<Float>(
+                        (Float(column) - centerX) * depth / focalX,
+                        (Float(row) - centerY) * depth / focalY,
+                        depth
+                    ),
+                    column: column,
+                    row: row
                 ))
             }
         }
@@ -129,8 +191,45 @@ enum TurntableFusion {
         for point in objectPoints { centroid += point }
         centroid /= Float(objectPoints.count)
 
-        // Project the centroid onto the plane: that is the axis foot.
-        let foot = centroid - plane.normal * simd_dot(centroid - plane.point, plane.normal)
+        // The axis foot is the centre of the object's footprint, NOT the
+        // centroid of everything inside the mask: the mask rectangle maps
+        // to a trapezoid on the plane whose area centroid sits well
+        // behind the object (12cm in offline simulation), and a pivot
+        // that far off smears every fused frame around a wrong centre.
+        // Use the raised points (the object itself): their extent
+        // midpoint in plane coordinates — the silhouette is fully visible
+        // from an elevated camera, top face included.
+        var foot = centroid - plane.normal * simd_dot(centroid - plane.point, plane.normal)
+        // The RANSAC normal's sign is arbitrary; orient it toward the
+        // object before testing heights.
+        let objectSide = simd_dot(centroid - plane.point, plane.normal) >= 0
+            ? plane.normal : -plane.normal
+        let raised = objectPoints.filter {
+            simd_dot($0 - plane.point, objectSide) >= 0.005
+        }
+        if raised.count >= 100 {
+            var tangent = simd_cross(plane.normal, SIMD3<Float>(0, 0, 1))
+            if simd_length(tangent) < 1e-4 {
+                tangent = simd_cross(plane.normal, SIMD3<Float>(1, 0, 0))
+            }
+            let e1 = simd_normalize(tangent)
+            let e2 = simd_cross(plane.normal, e1)
+            var sValues: [Float] = []
+            var tValues: [Float] = []
+            for point in raised {
+                let rel = point - plane.point
+                sValues.append(simd_dot(rel, e1))
+                tValues.append(simd_dot(rel, e2))
+            }
+            sValues.sort()
+            tValues.sort()
+            func extentMid(_ values: [Float]) -> Float {
+                let lo = values[Int(Float(values.count) * 0.02)]
+                let hi = values[Int(Float(values.count) * 0.98)]
+                return (lo + hi) / 2
+            }
+            foot = plane.point + e1 * extentMid(sValues) + e2 * extentMid(tValues)
+        }
 
         // Axis points from the surface toward the object.
         var direction = plane.normal
@@ -458,28 +557,48 @@ struct VoxelDistanceField {
         return list.sorted { $0.3 < $1.3 }
     }()
 
-    /// Mean capped distance (metres) and the fraction of points within
-    /// ~1.5 voxels of the reference. Lower mean / higher inliers = better.
-    func evaluate(_ points: [SIMD3<Float>]) -> (mean: Float, inliers: Float) {
-        guard !points.isEmpty else { return (1, 0) }
-        let cap = voxelSize * 3
-        var sum: Float = 0
+    /// Distance statistics of a point set against the reference surface.
+    ///
+    /// Distance is measured to the nearest occupied cell *centre*, not
+    /// quantised to whole-cell steps: with whole-cell steps the score is
+    /// flat over ±1 voxel, which at turntable radii is several degrees of
+    /// rotation — the estimator then has no gradient to climb.
+    ///
+    /// `trimmedMean` averages only the closest 65% of points. A rotating
+    /// object constantly shows surface the model has never seen; those
+    /// points are far from the model at *every* angle and, untrimmed, they
+    /// swamp the overlap region's gradient and bias the estimate toward
+    /// the previous view (both found by offline simulation, v0.5).
+    func evaluate(_ points: [SIMD3<Float>]) -> (mean: Float, trimmedMean: Float, inliers: Float) {
+        guard !points.isEmpty else { return (1, 1, 0) }
+        let cap = voxelSize * 5
+        var distances: [Float] = []
+        distances.reserveCapacity(points.count)
         var inside = 0
         for point in points {
             let cx = Int(floor(point.x / voxelSize))
             let cy = Int(floor(point.y / voxelSize))
             let cz = Int(floor(point.z / voxelSize))
             var distance = cap
-            for (dx, dy, dz, length) in Self.offsets {
-                if cells.contains(Self.packCell(cx + dx, cy + dy, cz + dz)) {
-                    distance = length * voxelSize
-                    break
+            for (dx, dy, dz, _) in Self.offsets {
+                let cellX = cx + dx, cellY = cy + dy, cellZ = cz + dz
+                if cells.contains(Self.packCell(cellX, cellY, cellZ)) {
+                    let center = SIMD3<Float>(
+                        (Float(cellX) + 0.5) * voxelSize,
+                        (Float(cellY) + 0.5) * voxelSize,
+                        (Float(cellZ) + 0.5) * voxelSize
+                    )
+                    distance = min(distance, simd_length(center - point))
                 }
             }
-            sum += distance
+            distances.append(distance)
             if distance <= voxelSize * 2 { inside += 1 }
         }
-        return (sum / Float(points.count), Float(inside) / Float(points.count))
+        let sorted = distances.sorted()
+        let mean = distances.reduce(0, +) / Float(distances.count)
+        let keep = max(1, Int(Float(sorted.count) * 0.65))
+        let trimmed = sorted.prefix(keep).reduce(0, +) / Float(keep)
+        return (mean, trimmed, Float(inside) / Float(points.count))
     }
 }
 
@@ -505,7 +624,8 @@ enum MicroAngleRegistration {
         func score(_ alignment: Float) -> (mean: Float, inliers: Float) {
             let r = TurntableFusion.rotationMatrix(axis: axisDirection, angleRadians: alignment)
             let rotated = points.map { axisPoint + r * ($0 - axisPoint) }
-            return reference.evaluate(rotated)
+            let e = reference.evaluate(rotated)
+            return (e.trimmedMean, e.inliers)
         }
         // Coarse sweep ±7° at 1°, then two refinements.
         var bestAngle: Float = 0
@@ -536,7 +656,8 @@ enum MicroAngleRegistration {
         func score(_ alignment: Float) -> (mean: Float, inliers: Float) {
             let r = TurntableFusion.rotationMatrix(axis: SIMD3<Float>(0, 1, 0), angleRadians: alignment)
             let rotated = points.map { r * $0 }
-            return reference.evaluate(rotated)
+            let e = reference.evaluate(rotated)
+            return (e.trimmedMean, e.inliers)
         }
         var bestAngle: Float = 0
         var best = score(0)
@@ -575,7 +696,7 @@ final class TSDFVolume: @unchecked Sendable {
     private(set) var tsdf: [Float]
     private(set) var weight: [Float]
 
-    init?(boundsMin: SIMD3<Float>, boundsMax: SIMD3<Float>, voxelSize: Float, maxVoxels: Int = 3_500_000) {
+    init?(boundsMin: SIMD3<Float>, boundsMax: SIMD3<Float>, voxelSize: Float, maxVoxels: Int = 6_000_000) {
         var voxel = voxelSize
         var dims = SIMD3<Int32>.zero
         // Grow the voxel until the volume fits the memory budget.
@@ -613,7 +734,7 @@ final class TSDFVolume: @unchecked Sendable {
     /// Integrates one frame of world-space surface points seen from
     /// `cameraOrigin` (also world space).
     func integrate(points: [SIMD3<Float>], cameraOrigin: SIMD3<Float>) {
-        let halfSteps = 3
+        let halfSteps = 2
         for point in points {
             let ray = point - cameraOrigin
             let length = simd_length(ray)
@@ -638,6 +759,34 @@ final class TSDFVolume: @unchecked Sendable {
                 weight[idx] = min(combined, 32)
             }
         }
+    }
+
+    /// Trilinearly interpolated signed distance (metres) at a world
+    /// point, averaged over whichever surrounding nodes have been
+    /// observed; nil only where the neighbourhood is entirely unobserved
+    /// (early on, most of a stencil is still empty — strict all-corners
+    /// sampling would blind the scorer for the first several frames).
+    /// Registration scores against this field: it is dense and smooth by
+    /// construction, where point-cloud renders have holes and
+    /// nearest-neighbour distances slide along planar faces.
+    func sampledDistance(at worldPoint: SIMD3<Float>) -> Float? {
+        let local = (worldPoint - origin) / voxelSize
+        let gx = Int(floor(local.x)), gy = Int(floor(local.y)), gz = Int(floor(local.z))
+        guard gx >= 0, gy >= 0, gz >= 0,
+              gx + 1 < Int(dimensions.x), gy + 1 < Int(dimensions.y), gz + 1 < Int(dimensions.z)
+        else { return nil }
+        let fx = local.x - Float(gx), fy = local.y - Float(gy), fz = local.z - Float(gz)
+        var weighted: Float = 0
+        var basisSum: Float = 0
+        for dz in 0...1 { for dy in 0...1 { for dx in 0...1 {
+            let idx = index(x: Int32(gx + dx), y: Int32(gy + dy), z: Int32(gz + dz))
+            guard weight[idx] > 0 else { continue }
+            let basis = (dx == 1 ? fx : 1 - fx) * (dy == 1 ? fy : 1 - fy) * (dz == 1 ? fz : 1 - fz)
+            weighted += basis * tsdf[idx]
+            basisSum += basis
+        } } }
+        guard basisSum > 0.05 else { return nil }
+        return (weighted / basisSum) * truncation
     }
 
     func value(x: Int, y: Int, z: Int) -> Float {
@@ -815,5 +964,19 @@ enum SurfaceNets {
             j += 3
         }
         for index in mesh.normals.indices { mesh.normals[index] = -mesh.normals[index] }
+    }
+}
+
+extension TurntableFusion {
+    /// Inverse of a rigid transform built by `turntableTransform` (its
+    /// rotation rows are the basis vectors, so the inverse rotation is the
+    /// transpose — no general matrix inverse needed).
+    static func applyInverse(_ transform: simd_float4x4, to point: SIMD3<Float>) -> SIMD3<Float> {
+        let t = SIMD3<Float>(transform.columns.3.x, transform.columns.3.y, transform.columns.3.z)
+        let d = point - t
+        let c0 = SIMD3<Float>(transform.columns.0.x, transform.columns.0.y, transform.columns.0.z)
+        let c1 = SIMD3<Float>(transform.columns.1.x, transform.columns.1.y, transform.columns.1.z)
+        let c2 = SIMD3<Float>(transform.columns.2.x, transform.columns.2.y, transform.columns.2.z)
+        return SIMD3<Float>(simd_dot(c0, d), simd_dot(c1, d), simd_dot(c2, d))
     }
 }
