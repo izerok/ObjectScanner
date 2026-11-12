@@ -67,7 +67,10 @@ enum TurntableFusion {
         let step = max(1, stride)
         for row in stride..<(height - stride) where row % step == 0 {
             let rowPointer = base.advanced(by: row * bytesPerRow).assumingMemoryBound(to: Float32.self)
-            let nextRowPointer = base.advanced(by: (row + step) * bytesPerRow).assumingMemoryBound(to: Float32.self)
+            // Clamp the "below" row: row + step can land one past the last
+            // row, and reading there is out of bounds (v0.4.1 hardening).
+            let belowRow = min(row + step, height - 1)
+            let nextRowPointer = base.advanced(by: belowRow * bytesPerRow).assumingMemoryBound(to: Float32.self)
             for column in stride..<(width - stride) where column % step == 0 {
                 if let maskRect {
                     let u = Float(column) / Float(width)
@@ -81,8 +84,9 @@ enum TurntableFusion {
                 guard depth.isFinite, depth >= minimumDepth, depth <= maximumDepth else { continue }
 
                 // Flying-pixel rejection at silhouette edges, same trick the
-                // TrueDepth processor uses.
-                let right = rowPointer[column + step]
+                // TrueDepth processor uses. The right neighbour is clamped
+                // for the same out-of-bounds reason as the row below.
+                let right = rowPointer[min(column + step, width - 1)]
                 let below = nextRowPointer[column]
                 if right.isFinite, abs(right - depth) > maximumNeighbourDelta { continue }
                 if below.isFinite, abs(below - depth) > maximumNeighbourDelta { continue }
@@ -114,7 +118,12 @@ enum TurntableFusion {
     /// approximation, which the per-frame registration partially absorbs.
     static func calibrateAxis(objectPoints: [SIMD3<Float>], backgroundPoints: [SIMD3<Float>]) -> Axis? {
         guard objectPoints.count >= 100, backgroundPoints.count >= 200 else { return nil }
-        guard let plane = fitPlane(points: backgroundPoints) else { return nil }
+        // RANSAC, not plain least squares: the background mixes table, floor
+        // and wall, and a least-squares fit splits the difference between
+        // them — an axis tens of degrees off, which no registration can
+        // recover from. (The RANSAC fit existed but was never wired in;
+        // found in the v0.4.1 audit.)
+        guard let plane = fitPlaneRANSAC(points: backgroundPoints) else { return nil }
 
         var centroid = SIMD3<Float>.zero
         for point in objectPoints { centroid += point }
@@ -468,7 +477,7 @@ struct VoxelDistanceField {
                 }
             }
             sum += distance
-            if distance <= voxelSize * 1.5 { inside += 1 }
+            if distance <= voxelSize * 2 { inside += 1 }
         }
         return (sum / Float(points.count), Float(inside) / Float(points.count))
     }

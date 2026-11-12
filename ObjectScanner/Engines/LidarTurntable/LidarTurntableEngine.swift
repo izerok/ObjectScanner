@@ -55,6 +55,10 @@ final class LidarTurntableEngine: ScanEngine {
     private(set) var lastHitRate: Float?
     /// Continuous tracking readouts (v0.4).
     private(set) var trackingQuality: LidarFusionCore.TrackingQuality = .good
+    /// Last registration fit, shown in the UI so a failing pipeline is
+    /// self-describing instead of silently dead (v0.4.1).
+    private(set) var lastInliers: Float?
+    private(set) var lastMeanMillimetres: Float?
     private(set) var passRotationDegrees: Float = 0
     private(set) var rotationSpeedDegPerSec: Float = 0
     private(set) var trackingPaused = false
@@ -332,10 +336,12 @@ final class LidarTurntableEngine: ScanEngine {
             case .reseeded:
                 trackingQuality = .good
                 lastAcceptedTickDate = Date()
-            case .tracked(.accepted(let deltaDegrees, _, let rotation, let quality)):
+            case .tracked(.accepted(let deltaDegrees, let inliers, let meanMM, let rotation, let quality)):
                 shotsThisPass += 1
                 totalShots += 1
                 lastDeltaDegrees = deltaDegrees
+                lastInliers = inliers
+                lastMeanMillimetres = meanMM
                 trackingQuality = quality
                 passRotationDegrees = rotation
                 let now = Date()
@@ -357,8 +363,10 @@ final class LidarTurntableEngine: ScanEngine {
                 } else {
                     statusMessage = nil
                 }
-            case .tracked(.rejected(let quality)):
+            case .tracked(.rejected(let quality, let inliers, let meanMM)):
                 rejectedShots += 1
+                lastInliers = inliers
+                lastMeanMillimetres = meanMM
                 trackingQuality = quality
                 if quality == .lost {
                     statusMessage = String(localized: "Takip kayboldu — çevirmeyi bırakın, yavaşça geri çevirerek takibi yakalayın.")
@@ -489,8 +497,8 @@ final class LidarFusionCore: @unchecked Sendable {
     }
 
     enum TrackResult: Sendable {
-        case accepted(deltaDegrees: Float, inliers: Float, passRotationDegrees: Float, quality: TrackingQuality)
-        case rejected(quality: TrackingQuality)
+        case accepted(deltaDegrees: Float, inliers: Float, meanMillimetres: Float, passRotationDegrees: Float, quality: TrackingQuality)
+        case rejected(quality: TrackingQuality, inliers: Float, meanMillimetres: Float)
     }
 
     private var volume: TSDFVolume?
@@ -526,7 +534,7 @@ final class LidarFusionCore: @unchecked Sendable {
         lockedSign = nil
         previousRawPoints = objectPoints
         referenceField = VoxelDistanceField(
-            points: TurntableFusion.subsample(objectPoints, limit: 1500), voxelSize: 0.004)
+            points: TurntableFusion.subsample(objectPoints, limit: 2000), voxelSize: 0.005)
         consecutiveLost = 0
         passRotation = 0
 
@@ -556,7 +564,7 @@ final class LidarFusionCore: @unchecked Sendable {
             // unknown. Distance-scored (v0.4); the result is the alignment
             // rotation itself, applied directly below.
             let modelPoints = fusedCloud.sampledPoints(limit: 6000)
-            let field = VoxelDistanceField(points: modelPoints, voxelSize: 0.004)
+            let field = VoxelDistanceField(points: modelPoints, voxelSize: 0.005)
             let estimate = MicroAngleRegistration.estimateYaw(
                 reference: field,
                 points: TurntableFusion.subsample(localPoints, limit: 1500)
@@ -585,12 +593,12 @@ final class LidarFusionCore: @unchecked Sendable {
     /// which is the exact failure that sank the discrete-shot design.
     func trackFrame(objectPoints: [SIMD3<Float>]) -> TrackResult {
         guard let axis = passAxis, let volume, let referenceField else {
-            return .rejected(quality: .lost)
+            return .rejected(quality: .lost, inliers: 0, meanMillimetres: 0)
         }
         guard objectPoints.count >= 150 else {
-            return .rejected(quality: .degraded)
+            return .rejected(quality: .degraded, inliers: 0, meanMillimetres: 0)
         }
-        let sample = TurntableFusion.subsample(objectPoints, limit: 1200)
+        let sample = TurntableFusion.subsample(objectPoints, limit: 2000)
         let estimate = MicroAngleRegistration.estimate(
             reference: referenceField,
             points: sample,
@@ -605,9 +613,13 @@ final class LidarFusionCore: @unchecked Sendable {
         let backwards = lockedSign.map { sign in
             delta != 0 && (delta > 0) != (sign > 0) && abs(delta) > 0.3 * .pi / 180
         } ?? false
-        guard estimate.inliers >= 0.5, estimate.meanDistance <= 0.012, !atBoundary, !backwards else {
+        guard estimate.inliers >= 0.40, estimate.meanDistance <= 0.013, !atBoundary, !backwards else {
             consecutiveLost += 1
-            return .rejected(quality: consecutiveLost >= 3 ? .lost : .degraded)
+            return .rejected(
+                quality: consecutiveLost >= 3 ? .lost : .degraded,
+                inliers: estimate.inliers,
+                meanMillimetres: estimate.meanDistance * 1000
+            )
         }
 
         if lockedSign == nil, abs(delta) >= 0.2 * .pi / 180 {
@@ -625,14 +637,15 @@ final class LidarFusionCore: @unchecked Sendable {
         volume.integrate(points: worldPoints, cameraOrigin: passCameraOriginWorld)
         fusedCloud.insert(TurntableFusion.subsample(worldPoints, limit: 6000))
         previousRawPoints = objectPoints
-        self.referenceField = VoxelDistanceField(points: sample, voxelSize: 0.004)
+        self.referenceField = VoxelDistanceField(points: sample, voxelSize: 0.005)
         consecutiveLost = 0
 
         return .accepted(
             deltaDegrees: abs(delta * 180 / .pi),
             inliers: estimate.inliers,
+            meanMillimetres: estimate.meanDistance * 1000,
             passRotationDegrees: passRotation * 180 / .pi,
-            quality: estimate.inliers >= 0.72 ? .good : .degraded
+            quality: estimate.inliers >= 0.65 ? .good : .degraded
         )
     }
 
@@ -643,7 +656,7 @@ final class LidarFusionCore: @unchecked Sendable {
     func reseedReference(objectPoints: [SIMD3<Float>]) {
         guard objectPoints.count >= 150 else { return }
         referenceField = VoxelDistanceField(
-            points: TurntableFusion.subsample(objectPoints, limit: 1200), voxelSize: 0.004)
+            points: TurntableFusion.subsample(objectPoints, limit: 2000), voxelSize: 0.005)
         consecutiveLost = 0
     }
 

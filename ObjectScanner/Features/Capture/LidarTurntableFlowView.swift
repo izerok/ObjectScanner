@@ -412,6 +412,12 @@ private struct LidarOverlay: View {
             }
             Label("\(Int(engine.rotationSpeedDegPerSec.rounded()))°/s", systemImage: "speedometer")
             Label("\(engine.totalShots)", systemImage: "square.stack.3d.up")
+            if let inliers = engine.lastInliers {
+                Label("%\(Int((inliers * 100).rounded()))", systemImage: "scope")
+            }
+            if let meanMM = engine.lastMeanMillimetres, meanMM > 0 {
+                Label(String(format: "%.0fmm", meanMM), systemImage: "ruler")
+            }
             if engine.rejectedShots > 0 {
                 Label("\(engine.rejectedShots)", systemImage: "camera.metering.none")
                     .foregroundStyle(.orange)

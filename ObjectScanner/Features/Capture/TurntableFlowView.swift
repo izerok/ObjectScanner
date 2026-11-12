@@ -236,7 +236,7 @@ struct CameraPreviewView: UIViewRepresentable {
 
     func updateUIView(_ view: PreviewView, context: Context) {
         installReporter(on: view)
-        view.reportMask?()
+        view.scheduleReport()
     }
 
     /// Reports the mask in capture coordinates. Called on every update *and*
@@ -284,10 +284,27 @@ struct CameraPreviewView: UIViewRepresentable {
 
         var reportMask: (() -> Void)?
         var lastReportedMask: CGRect?
+        private var reportScheduled = false
+
+        /// Reports are ALWAYS delivered on the next runloop turn, never
+        /// synchronously. The consumer is an @Observable setter: calling it
+        /// from inside layout (v0.3.2) let a finish-time transition — bounds
+        /// oscillating while the capture stage is dismantled — feed back
+        /// into layout and recurse until the app died. Coalescing here makes
+        /// that loop structurally impossible (v0.4.1).
+        func scheduleReport() {
+            guard !reportScheduled, reportMask != nil else { return }
+            reportScheduled = true
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.reportScheduled = false
+                self.reportMask?()
+            }
+        }
 
         override func layoutSubviews() {
             super.layoutSubviews()
-            reportMask?()
+            scheduleReport()
         }
     }
 }
