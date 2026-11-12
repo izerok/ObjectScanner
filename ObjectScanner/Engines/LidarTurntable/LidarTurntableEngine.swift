@@ -53,6 +53,11 @@ final class LidarTurntableEngine: ScanEngine {
     private(set) var rejectedShots = 0
     private(set) var lastDeltaDegrees: Float?
     private(set) var lastHitRate: Float?
+    /// Continuous tracking readouts (v0.4).
+    private(set) var trackingQuality: LidarFusionCore.TrackingQuality = .good
+    private(set) var passRotationDegrees: Float = 0
+    private(set) var rotationSpeedDegPerSec: Float = 0
+    private(set) var trackingPaused = false
     private(set) var statusMessage: String?
     private(set) var isProcessingShot = false
     var isAutoCapturing = false {
@@ -87,7 +92,7 @@ final class LidarTurntableEngine: ScanEngine {
 
     var session: AVCaptureSession? { stream?.session }
 
-    var canFinish: Bool { totalShots >= 8 && fusedPointCount > 500 }
+    var canFinish: Bool { totalShots >= 30 && fusedPointCount > 500 }
 
     // MARK: - Private
 
@@ -143,7 +148,7 @@ final class LidarTurntableEngine: ScanEngine {
             throw ScanEngineError.sessionUnavailable(String(localized: "Aktif oturum yok."))
         }
         guard canFinish else {
-            throw ScanEngineError.reconstructionFailed(String(localized: "Yeterli kare yok — en az 8 kare ve bir tam tur gerekir."))
+            throw ScanEngineError.reconstructionFailed(String(localized: "Yeterli kare yok — en az 30 kare gerekir."))
         }
 
         isAutoCapturing = false
@@ -222,13 +227,26 @@ final class LidarTurntableEngine: ScanEngine {
     // MARK: - Capture actions
 
     /// The one primary button: calibrates + first frame while framing,
-    /// takes a frame while capturing.
+    /// pauses/resumes tracking while capturing.
     func primaryAction() {
         guard !isProcessingShot else { return }
         switch passState {
         case .framing: calibrateAndBeginPass()
-        case .capturing: captureShot()
+        case .capturing: setTrackingPaused(!trackingPaused)
         case .awaitingElevation: break
+        }
+    }
+
+    /// Pause/resume for the tracking loop. Resuming re-anchors on the next
+    /// frame, so the object must not move while paused.
+    func setTrackingPaused(_ paused: Bool) {
+        guard passState == .capturing else { return }
+        trackingPaused = paused
+        if paused {
+            isAutoCapturing = false
+        } else {
+            reseedOnResume = true
+            isAutoCapturing = true
         }
     }
 
@@ -268,43 +286,83 @@ final class LidarTurntableEngine: ScanEngine {
                 statusMessage = yawWarning
                 passState = .capturing
                 phase = .capturing(shots: totalShots, limit: 0)
-                restartAutoCapture()
+                passRotationDegrees = 0
+                rotationSpeedDegPerSec = 0
+                trackingQuality = .good
+                trackingPaused = false
+                lastAcceptedTickDate = nil
+                isAutoCapturing = true
             }
         }
     }
 
-    private func captureShot() {
-        guard let depth = freshDepth() else {
-            // v0.3 returned silently here — the tap looked dead. Always say why.
-            statusMessage = String(localized: "Derinlik akışı henüz hazır değil — bir saniye bekleyin.")
-            return
-        }
-        guard let mask = objectMaskRect else {
-            statusMessage = String(localized: "Önce çerçeveyi objenin üzerine yerleştirin.")
-            return
-        }
-        isProcessingShot = true
+    private var tickInFlight = false
+    private var reseedOnResume = false
+    private var lastAcceptedTickDate: Date?
+
+    private enum TickOutcome: Sendable {
+        case tracked(LidarFusionCore.TrackResult)
+        case reseeded
+    }
+
+    /// One tracking sample: register the newest depth frame against the
+    /// previous one and fuse it if the fit holds. Runs ~5×/s while tracking.
+    private func trackTick() {
+        guard passState == .capturing, !tickInFlight else { return }
+        guard let depth = freshDepth() else { return }
+        let mask = objectMaskRect ?? CGRect(x: 0.15, y: 0.2, width: 0.7, height: 0.6)
+        tickInFlight = true
         let core = self.core
         let box = DepthFrameBox(depth)
+        let reseed = reseedOnResume
+        reseedOnResume = false
         Task { @MainActor in
-            let result = await Task.detached(priority: .userInitiated) { () -> LidarFusionCore.ShotResult in
-                let objectPoints = TurntableFusion.points(from: box.depth, maskRect: mask, insideMask: true, stride: 2)
-                return core.captureShot(objectPoints: objectPoints)
+            let outcome = await Task.detached(priority: .userInitiated) { () -> TickOutcome in
+                let points = TurntableFusion.points(from: box.depth, maskRect: mask, insideMask: true, stride: 2)
+                if reseed {
+                    core.reseedReference(objectPoints: points)
+                    return .reseeded
+                }
+                return .tracked(core.trackFrame(objectPoints: points))
             }.value
 
-            isProcessingShot = false
+            tickInFlight = false
             fusedPointCount = core.fusedPointCountSnapshot
-            switch result {
-            case .accepted(let deltaDegrees, let hitRate):
+            switch outcome {
+            case .reseeded:
+                trackingQuality = .good
+                lastAcceptedTickDate = Date()
+            case .tracked(.accepted(let deltaDegrees, _, let rotation, let quality)):
                 shotsThisPass += 1
                 totalShots += 1
                 lastDeltaDegrees = deltaDegrees
-                lastHitRate = hitRate
-                statusMessage = nil
+                trackingQuality = quality
+                passRotationDegrees = rotation
+                let now = Date()
+                if let last = lastAcceptedTickDate {
+                    let dt = max(0.05, now.timeIntervalSince(last))
+                    let speed = deltaDegrees / Float(dt)
+                    rotationSpeedDegPerSec = rotationSpeedDegPerSec == 0
+                        ? speed
+                        : rotationSpeedDegPerSec * 0.6 + speed * 0.4
+                }
+                lastAcceptedTickDate = now
                 phase = .capturing(shots: totalShots, limit: 0)
-            case .rejected(let message):
+                if rotation >= 355 {
+                    isAutoCapturing = false
+                    trackingPaused = true
+                    statusMessage = String(localized: "Bu tur tamamlandı — bitirebilir veya yükseklik değiştirebilirsiniz.")
+                } else if quality == .degraded {
+                    statusMessage = String(localized: "Takip zayıf — daha yavaş çevirin.")
+                } else {
+                    statusMessage = nil
+                }
+            case .tracked(.rejected(let quality)):
                 rejectedShots += 1
-                statusMessage = message
+                trackingQuality = quality
+                if quality == .lost {
+                    statusMessage = String(localized: "Takip kayboldu — çevirmeyi bırakın, yavaşça geri çevirerek takibi yakalayın.")
+                }
             }
         }
     }
@@ -329,6 +387,9 @@ final class LidarTurntableEngine: ScanEngine {
         passState = .framing
         phase = .framing
         statusMessage = nil
+        passRotationDegrees = 0
+        trackingPaused = false
+        trackingQuality = .good
     }
 
     // MARK: - Private helpers
@@ -384,9 +445,9 @@ final class LidarTurntableEngine: ScanEngine {
         guard isAutoCapturing, passState == .capturing else { return }
         autoCaptureTask = Task { @MainActor [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(2.2))
                 guard let self, self.isAutoCapturing, self.passState == .capturing else { return }
-                if !self.isProcessingShot { self.captureShot() }
+                self.trackTick()
+                try? await Task.sleep(for: .milliseconds(200))
             }
         }
     }
@@ -423,9 +484,13 @@ final class LidarFusionCore: @unchecked Sendable {
         case failed(message: String)
     }
 
-    enum ShotResult: Sendable {
-        case accepted(deltaDegrees: Float, hitRate: Float)
-        case rejected(message: String)
+    enum TrackingQuality: Sendable {
+        case good, degraded, lost
+    }
+
+    enum TrackResult: Sendable {
+        case accepted(deltaDegrees: Float, inliers: Float, passRotationDegrees: Float, quality: TrackingQuality)
+        case rejected(quality: TrackingQuality)
     }
 
     private var volume: TSDFVolume?
@@ -437,6 +502,12 @@ final class LidarFusionCore: @unchecked Sendable {
     private var passYaw: Float = 0
     private var cumulativeAngle: Float = 0
     private var lockedSign: Float?
+
+    // Continuous tracking state (v0.4): the reference is the previous
+    // sampled frame as a distance field, replaced on every accepted frame.
+    private var referenceField: VoxelDistanceField?
+    private var consecutiveLost = 0
+    private var passRotation: Float = 0
 
     var fusedPointCountSnapshot: Int { fusedCloud.pointCount }
 
@@ -454,6 +525,10 @@ final class LidarFusionCore: @unchecked Sendable {
         cumulativeAngle = 0
         lockedSign = nil
         previousRawPoints = objectPoints
+        referenceField = VoxelDistanceField(
+            points: TurntableFusion.subsample(objectPoints, limit: 1500), voxelSize: 0.004)
+        consecutiveLost = 0
+        passRotation = 0
 
         let localPoints = objectPoints.map { TurntableFusion.apply(transform, to: $0) }
         var yaw: Float = 0
@@ -477,13 +552,18 @@ final class LidarFusionCore: @unchecked Sendable {
                 return .failed(message: String(localized: "Model oluşturulamadı: obje çok büyük."))
             }
         } else {
-            // Register this pass against the fused model: only yaw is unknown.
+            // Register this pass against the fused model: only yaw is
+            // unknown. Distance-scored (v0.4); the result is the alignment
+            // rotation itself, applied directly below.
             let modelPoints = fusedCloud.sampledPoints(limit: 6000)
-            if let estimate = TurntableFusion.estimateYaw(currentWorld: localPoints, modelPoints: modelPoints) {
-                yaw = estimate.yawRadians
-                if estimate.hitRate < 0.25 {
-                    yawWarning = String(localized: "Yeni geçiş önceki modelle zayıf eşleşti — obje yerinden oynamış olabilir.")
-                }
+            let field = VoxelDistanceField(points: modelPoints, voxelSize: 0.004)
+            let estimate = MicroAngleRegistration.estimateYaw(
+                reference: field,
+                points: TurntableFusion.subsample(localPoints, limit: 1500)
+            )
+            yaw = estimate.alignment
+            if estimate.inliers < 0.30 {
+                yawWarning = String(localized: "Yeni geçiş önceki modelle zayıf eşleşti — obje yerinden oynamış olabilir.")
             }
         }
         passYaw = yaw
@@ -497,24 +577,44 @@ final class LidarFusionCore: @unchecked Sendable {
         return .begun(yawWarning: yawWarning)
     }
 
-    func captureShot(objectPoints: [SIMD3<Float>]) -> ShotResult {
-        guard let axis = passAxis, let volume else {
-            return .rejected(message: String(localized: "Önce çerçeveyi objenin üzerine yerleştirin."))
+    /// One tracking sample of the continuous-rotation pipeline (v0.4). The
+    /// frame is registered against the *previous sampled frame* — a degree
+    /// or three away, inside a ±7° distance-scored search — and only
+    /// integrated when the fit is genuinely good. A rejected frame changes
+    /// nothing but the lost counter: bad geometry never enters the volume,
+    /// which is the exact failure that sank the discrete-shot design.
+    func trackFrame(objectPoints: [SIMD3<Float>]) -> TrackResult {
+        guard let axis = passAxis, let volume, let referenceField else {
+            return .rejected(quality: .lost)
         }
         guard objectPoints.count >= 150 else {
-            return .rejected(message: String(localized: "Çerçeve içinde yeterli derinlik yok — objeye yaklaşın."))
+            return .rejected(quality: .degraded)
         }
-        guard let estimate = TurntableFusion.estimateRotation(
-            current: objectPoints,
-            previous: previousRawPoints,
-            axis: axis,
-            lockedSign: lockedSign
-        ), estimate.hitRate >= 0.30 else {
-            return .rejected(message: String(localized: "Kare hizalanamadı — daha yavaş çevirin, her adım yaklaşık 10° olsun."))
+        let sample = TurntableFusion.subsample(objectPoints, limit: 1200)
+        let estimate = MicroAngleRegistration.estimate(
+            reference: referenceField,
+            points: sample,
+            axisPoint: axis.point,
+            axisDirection: axis.direction
+        )
+        let delta = estimate.delta
+        // A winner at the search edge means the rotation outran the window.
+        let atBoundary = abs(delta) > 6.8 * .pi / 180
+        // Reversing direction mid-pass would corrupt the accumulation; small
+        // jitter around zero is fine.
+        let backwards = lockedSign.map { sign in
+            delta != 0 && (delta > 0) != (sign > 0) && abs(delta) > 0.3 * .pi / 180
+        } ?? false
+        guard estimate.inliers >= 0.5, estimate.meanDistance <= 0.012, !atBoundary, !backwards else {
+            consecutiveLost += 1
+            return .rejected(quality: consecutiveLost >= 3 ? .lost : .degraded)
         }
 
-        lockedSign = estimate.sign
-        cumulativeAngle += estimate.deltaRadians
+        if lockedSign == nil, abs(delta) >= 0.2 * .pi / 180 {
+            lockedSign = delta > 0 ? 1 : -1
+        }
+        cumulativeAngle += delta
+        passRotation += abs(delta)
 
         let unrotate = TurntableFusion.rotationMatrix(axis: axis.direction, angleRadians: -cumulativeAngle)
         let yawRotation = TurntableFusion.rotationMatrix(axis: SIMD3<Float>(0, 1, 0), angleRadians: passYaw)
@@ -525,11 +625,26 @@ final class LidarFusionCore: @unchecked Sendable {
         volume.integrate(points: worldPoints, cameraOrigin: passCameraOriginWorld)
         fusedCloud.insert(TurntableFusion.subsample(worldPoints, limit: 6000))
         previousRawPoints = objectPoints
+        self.referenceField = VoxelDistanceField(points: sample, voxelSize: 0.004)
+        consecutiveLost = 0
 
         return .accepted(
-            deltaDegrees: abs(estimate.deltaRadians * 180 / .pi),
-            hitRate: estimate.hitRate
+            deltaDegrees: abs(delta * 180 / .pi),
+            inliers: estimate.inliers,
+            passRotationDegrees: passRotation * 180 / .pi,
+            quality: estimate.inliers >= 0.72 ? .good : .degraded
         )
+    }
+
+    /// Re-anchors tracking after a pause: the next frame becomes the
+    /// reference without being integrated and without touching the
+    /// accumulated angle (the object is assumed not to have moved while
+    /// paused — the UI says so).
+    func reseedReference(objectPoints: [SIMD3<Float>]) {
+        guard objectPoints.count >= 150 else { return }
+        referenceField = VoxelDistanceField(
+            points: TurntableFusion.subsample(objectPoints, limit: 1200), voxelSize: 0.004)
+        consecutiveLost = 0
     }
 
     func extractMeshAndPoints() -> (mesh: SurfaceNets.Mesh, points: [SIMD3<Float>], dimensions: SIMD3<Float>?)? {

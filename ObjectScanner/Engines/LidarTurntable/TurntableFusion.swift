@@ -412,6 +412,142 @@ enum TurntableFusion {
     }
 }
 
+// MARK: - Distance-field registration (v0.4 continuous tracking)
+
+/// A voxelised reference cloud that answers "how far is this point from the
+/// reference surface" — the scoring the hit-rate gate should have been. A
+/// wrong rotation now *costs* distance instead of passing on fat-cell overlap.
+struct VoxelDistanceField {
+    let voxelSize: Float
+    let cells: Set<Int>
+
+    init(points: [SIMD3<Float>], voxelSize: Float) {
+        self.voxelSize = voxelSize
+        var set = Set<Int>()
+        set.reserveCapacity(points.count)
+        for point in points { set.insert(Self.pack(point, voxelSize: voxelSize)) }
+        cells = set
+    }
+
+    private static func pack(_ point: SIMD3<Float>, voxelSize: Float) -> Int {
+        let x = Int(floor(point.x / voxelSize)) + 512
+        let y = Int(floor(point.y / voxelSize)) + 512
+        let z = Int(floor(point.z / voxelSize)) + 512
+        return (x << 20) | (y << 10) | z
+    }
+
+    private static func packCell(_ x: Int, _ y: Int, _ z: Int) -> Int {
+        ((x + 512) << 20) | ((y + 512) << 10) | (z + 512)
+    }
+
+    /// Neighbour offsets ordered by length: own cell first, then the 26 ring.
+    private static let offsets: [(Int, Int, Int, Float)] = {
+        var list: [(Int, Int, Int, Float)] = []
+        for dx in -1...1 { for dy in -1...1 { for dz in -1...1 {
+            list.append((dx, dy, dz, sqrt(Float(dx * dx + dy * dy + dz * dz))))
+        } } }
+        return list.sorted { $0.3 < $1.3 }
+    }()
+
+    /// Mean capped distance (metres) and the fraction of points within
+    /// ~1.5 voxels of the reference. Lower mean / higher inliers = better.
+    func evaluate(_ points: [SIMD3<Float>]) -> (mean: Float, inliers: Float) {
+        guard !points.isEmpty else { return (1, 0) }
+        let cap = voxelSize * 3
+        var sum: Float = 0
+        var inside = 0
+        for point in points {
+            let cx = Int(floor(point.x / voxelSize))
+            let cy = Int(floor(point.y / voxelSize))
+            let cz = Int(floor(point.z / voxelSize))
+            var distance = cap
+            for (dx, dy, dz, length) in Self.offsets {
+                if cells.contains(Self.packCell(cx + dx, cy + dy, cz + dz)) {
+                    distance = length * voxelSize
+                    break
+                }
+            }
+            sum += distance
+            if distance <= voxelSize * 1.5 { inside += 1 }
+        }
+        return (sum / Float(points.count), Float(inside) / Float(points.count))
+    }
+}
+
+/// Frame-to-frame micro-rotation estimation for continuous tracking: adjacent
+/// sampled frames differ by only a degree or three, which collapses the
+/// search window to ±7° and removes the aliasing that destroyed discrete-shot
+/// registration. Scored by distance, refined coarse-to-fine.
+enum MicroAngleRegistration {
+    struct Result {
+        var delta: Float          // radians (signed)
+        var meanDistance: Float
+        var inliers: Float
+    }
+
+    /// Finds the object's rotation since the reference frame. The search
+    /// runs over *alignment* angles (rotating the current points back onto
+    /// the reference); the returned delta is the object's own rotation,
+    /// matching the convention `estimateRotation` established.
+    static func estimate(reference: VoxelDistanceField,
+                         points: [SIMD3<Float>],
+                         axisPoint: SIMD3<Float>,
+                         axisDirection: SIMD3<Float>) -> Result {
+        func score(_ alignment: Float) -> (mean: Float, inliers: Float) {
+            let r = TurntableFusion.rotationMatrix(axis: axisDirection, angleRadians: alignment)
+            let rotated = points.map { axisPoint + r * ($0 - axisPoint) }
+            return reference.evaluate(rotated)
+        }
+        // Coarse sweep ±7° at 1°, then two refinements.
+        var bestAngle: Float = 0
+        var best = score(0)
+        var angle: Float = -7 * .pi / 180
+        while angle <= 7 * .pi / 180 {
+            let s = score(angle)
+            if s.mean < best.mean { best = s; bestAngle = angle }
+            angle += 1 * .pi / 180
+        }
+        for (window, step) in [(Float(0.9), Float(0.3)), (Float(0.25), Float(0.05))] {
+            var candidate = bestAngle - window * .pi / 180
+            let end = bestAngle + window * .pi / 180
+            while candidate <= end {
+                let s = score(candidate)
+                if s.mean < best.mean { best = s; bestAngle = candidate }
+                candidate += step * .pi / 180
+            }
+        }
+        return Result(delta: -bestAngle, meanDistance: best.mean, inliers: best.inliers)
+    }
+
+    /// Whole-circle alignment of a new pass against the fused model.
+    /// Returns the alignment rotation itself — the angle to rotate the new
+    /// pass's points by so they land on the model.
+    static func estimateYaw(reference: VoxelDistanceField,
+                            points: [SIMD3<Float>]) -> (alignment: Float, inliers: Float) {
+        func score(_ alignment: Float) -> (mean: Float, inliers: Float) {
+            let r = TurntableFusion.rotationMatrix(axis: SIMD3<Float>(0, 1, 0), angleRadians: alignment)
+            let rotated = points.map { r * $0 }
+            return reference.evaluate(rotated)
+        }
+        var bestAngle: Float = 0
+        var best = score(0)
+        var angle: Float = 2 * .pi / 180
+        while angle < 2 * .pi {
+            let s = score(angle)
+            if s.mean < best.mean { best = s; bestAngle = angle }
+            angle += 2 * .pi / 180
+        }
+        var candidate = bestAngle - 2 * .pi / 180
+        let end = bestAngle + 2 * .pi / 180
+        while candidate <= end {
+            let s = score(candidate)
+            if s.mean < best.mean { best = s; bestAngle = candidate }
+            candidate += 0.25 * .pi / 180
+        }
+        return (bestAngle, best.inliers)
+    }
+}
+
 // MARK: - TSDF volume
 
 /// A truncated signed-distance volume in turntable space.

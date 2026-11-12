@@ -139,6 +139,10 @@ private struct LidarSetupGuide: View {
                         text: String(localized: "Geçişler arasında objeye dokunmayın; yalnızca telefonu yeni yüksekliğe taşıyın. Her geçiş kendi eksenini yeniden bulur.")
                     )
                     guideRow(
+                        systemImage: "tornado",
+                        text: String(localized: "Başladıktan sonra objeyi yavaşça ve durmadan çevirin — bir tur yaklaşık 40-60 saniye sürsün. Takip kaybolursa yavaşça geri çevirin.")
+                    )
+                    guideRow(
                         systemImage: "paintbrush",
                         text: String(localized: "Desensiz, düz renkli objelerde en iyi sonucu verir; çok parlak ve şeffaf yüzeylerde derinlik ölçülemez.")
                     )
@@ -269,29 +273,22 @@ private struct LidarOverlay: View {
 
         case .capturing:
             VStack(spacing: 10) {
+                trackingStatusRow
+                ProgressView(value: min(Double(engine.passRotationDegrees), 360), total: 360)
+                    .tint(trackingTint)
                 statsRow
                 HStack(spacing: 10) {
                     Button {
                         engine.primaryAction()
                     } label: {
-                        Label(String(localized: "Kare Çek"), systemImage: "camera.fill")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(TurntablePrimaryButton())
-                    .disabled(engine.isProcessingShot)
-
-                    Button {
-                        engine.isAutoCapturing.toggle()
-                    } label: {
                         Label(
-                            String(localized: "Otomatik"),
-                            systemImage: engine.isAutoCapturing ? "pause.fill" : "play.fill"
+                            engine.trackingPaused ? String(localized: "Devam Et") : String(localized: "Duraklat"),
+                            systemImage: engine.trackingPaused ? "play.fill" : "pause.fill"
                         )
                         .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(TurntableSecondaryButton())
-                }
-                HStack(spacing: 10) {
+                    .buttonStyle(TurntablePrimaryButton())
+
                     Button {
                         engine.beginElevationChange()
                     } label: {
@@ -299,20 +296,19 @@ private struct LidarOverlay: View {
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(TurntableSecondaryButton())
-
-                    Button {
-                        finish()
-                    } label: {
-                        HStack {
-                            if isFinishing { ProgressView().tint(.black) }
-                            Text(String(localized: "Bitir ve Modeli Oluştur"))
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(TurntablePrimaryButton())
-                    .disabled(!engine.canFinish || isFinishing)
                 }
-                if engine.shotsThisPass >= 36 {
+                Button {
+                    finish()
+                } label: {
+                    HStack {
+                        if isFinishing { ProgressView().tint(.black) }
+                        Text(String(localized: "Bitir ve Modeli Oluştur"))
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(TurntablePrimaryButton())
+                .disabled(!engine.canFinish || isFinishing)
+                if engine.passRotationDegrees >= 355 {
                     Text(String(localized: "Bir tur tamamlandı — böyle devam edebilir veya yüksekliği değiştirebilirsiniz."))
                         .font(.caption)
                         .foregroundStyle(.yellow)
@@ -377,26 +373,50 @@ private struct LidarOverlay: View {
         .foregroundStyle(.white.opacity(0.9))
     }
 
+    private var trackingTint: Color {
+        switch engine.trackingQuality {
+        case .good: return .green
+        case .degraded: return .yellow
+        case .lost: return .red
+        }
+    }
+
+    private var trackingStatusRow: some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(trackingTint)
+                .frame(width: 10, height: 10)
+            Text(
+                engine.trackingPaused
+                    ? String(localized: "Duraklatıldı")
+                    : engine.trackingQuality == .good
+                        ? String(localized: "Takip iyi")
+                        : engine.trackingQuality == .degraded
+                            ? String(localized: "Takip zayıf")
+                            : String(localized: "Takip kayboldu")
+            )
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.white)
+            Spacer()
+            Text(String(localized: "Tur: \(Int(engine.passRotationDegrees.rounded()))° / 360°"))
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.white.opacity(0.85))
+        }
+    }
+
     private var statsRow: some View {
         HStack(spacing: 14) {
             if !engine.isDepthLive {
                 Label(String(localized: "Derinlik akışı kesildi"), systemImage: "sensor.fill")
                     .foregroundStyle(.orange)
             }
-            if let delta = engine.lastDeltaDegrees {
-                Label("\(Int(delta.rounded()))°", systemImage: "rotate.right")
-            }
-            if let rate = engine.lastHitRate {
-                Label("%\(Int((rate * 100).rounded()))", systemImage: "scope")
-            }
+            Label("\(Int(engine.rotationSpeedDegPerSec.rounded()))°/s", systemImage: "speedometer")
+            Label("\(engine.totalShots)", systemImage: "square.stack.3d.up")
             if engine.rejectedShots > 0 {
                 Label("\(engine.rejectedShots)", systemImage: "camera.metering.none")
                     .foregroundStyle(.orange)
             }
             Spacer()
-            if engine.isProcessingShot {
-                ProgressView().tint(.white)
-            }
         }
         .font(.caption.weight(.medium))
         .foregroundStyle(.white.opacity(0.9))

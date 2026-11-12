@@ -5976,6 +5976,248 @@
           }
         }
       }
+    },
+    "Başladıktan sonra objeyi yavaşça ve durmadan çevirin — bir tur yaklaşık 40-60 saniye sürsün. Takip kaybolursa yavaşça geri çevirin.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Once started, rotate the object slowly and steadily — one revolution should take about 40–60 seconds. If tracking is lost, rotate slowly back."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Başladıktan sonra objeyi yavaşça ve durmadan çevirin — bir tur yaklaşık 40-60 saniye sürsün. Takip kaybolursa yavaşça geri çevirin."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开始后缓慢匀速地转动物体——一圈大约用 40–60 秒。追踪丢失时，慢慢往回转。"
+          }
+        }
+      }
+    },
+    "Bu tur tamamlandı — bitirebilir veya yükseklik değiştirebilirsiniz.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This revolution is complete — you can finish or change height."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu tur tamamlandı — bitirebilir veya yükseklik değiştirebilirsiniz."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这一圈已转满——可以完成，或更换高度。"
+          }
+        }
+      }
+    },
+    "Takip zayıf — daha yavaş çevirin.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tracking is weak — rotate more slowly."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Takip zayıf — daha yavaş çevirin."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "追踪不稳——请转得更慢。"
+          }
+        }
+      }
+    },
+    "Takip kayboldu — çevirmeyi bırakın, yavaşça geri çevirerek takibi yakalayın.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tracking lost — stop rotating, then turn slowly back to re-acquire it."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Takip kayboldu — çevirmeyi bırakın, yavaşça geri çevirerek takibi yakalayın."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "追踪丢失——先停住，再慢慢往回转，直到重新锁定。"
+          }
+        }
+      }
+    },
+    "Yeterli kare yok — en az 30 kare gerekir.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not enough frames — at least 30 are required."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeterli kare yok — en az 30 kare gerekir."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "帧数不足——至少需要 30 帧。"
+          }
+        }
+      }
+    },
+    "Takip iyi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tracking good"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Takip iyi"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "追踪良好"
+          }
+        }
+      }
+    },
+    "Takip kayboldu": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tracking lost"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Takip kayboldu"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "追踪丢失"
+          }
+        }
+      }
+    },
+    "Duraklat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pause"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Duraklat"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暂停"
+          }
+        }
+      }
+    },
+    "Devam Et": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resume"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Devam Et"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "继续"
+          }
+        }
+      }
+    },
+    "Duraklatıldı": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paused"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Duraklatıldı"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已暂停"
+          }
+        }
+      }
+    },
+    "Tur: %lld° / 360°": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Revolution: %lld° / 360°"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tur: %lld° / 360°"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本圈：%lld° / 360°"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
